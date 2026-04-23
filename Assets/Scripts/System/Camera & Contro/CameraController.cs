@@ -25,14 +25,14 @@ public class CameraController : MonoBehaviour
 
     void HandleMovement()
     {
-        // 🟢 กดคลิกซ้ายค้าง = ขยับได้
-        if (Input.GetMouseButton(0))
+        // 🟢 คลิกซ้าย หรือ คลิกขวา = ขยับได้
+        if (Input.GetMouseButton(0) || Input.GetMouseButton(1))
         {
             float h = Input.GetAxis("Horizontal"); // A D
             float v = Input.GetAxis("Vertical");   // W S
 
             Vector3 dir = transform.forward * v + transform.right * h;
-            dir.y = 0; // ไม่ให้ลอยขึ้นลง
+            dir.y = 0;
 
             transform.position += dir * moveSpeed * Time.deltaTime;
         }
