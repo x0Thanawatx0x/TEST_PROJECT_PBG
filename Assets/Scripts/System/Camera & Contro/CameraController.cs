@@ -25,22 +25,19 @@ public class CameraController : MonoBehaviour
 
     void HandleMovement()
     {
-        // 🟢 คลิกซ้าย หรือ คลิกขวา = ขยับได้
-        if (Input.GetMouseButton(0) || Input.GetMouseButton(1))
-        {
-            float h = Input.GetAxis("Horizontal"); // A D
-            float v = Input.GetAxis("Vertical");   // W S
+        // ✅ ไม่ต้องคลิกแล้ว กด WASD ได้เลย
+        float h = Input.GetAxis("Horizontal"); // A D
+        float v = Input.GetAxis("Vertical");   // W S
 
-            Vector3 dir = transform.forward * v + transform.right * h;
-            dir.y = 0;
+        Vector3 dir = transform.forward * v + transform.right * h;
+        dir.y = 0;
 
-            transform.position += dir * moveSpeed * Time.deltaTime;
-        }
+        transform.position += dir * moveSpeed * Time.deltaTime;
     }
 
     void HandleRotation()
     {
-        // 🔵 คลิกขวาค้าง = หมุน
+        // 🔵 คลิกขวาค้าง = หมุน (ยังเหมือนเดิม)
         if (Input.GetMouseButton(1))
         {
             float mouseX = Input.GetAxis("Mouse X") * rotationSpeed * 100f * Time.deltaTime;
@@ -49,7 +46,6 @@ public class CameraController : MonoBehaviour
             currentX += mouseX;
             currentY -= mouseY;
 
-            // ล็อกมุมเงย
             currentY = Mathf.Clamp(currentY, -30f, 80f);
 
             transform.rotation = Quaternion.Euler(currentY, currentX, 0);

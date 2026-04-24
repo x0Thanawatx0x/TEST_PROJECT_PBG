@@ -10,32 +10,52 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
-  m_Name: PGB_Translate_th
+  m_Name: PGB_Translate_en
   m_EditorClassIdentifier: 
   m_LocaleId:
-    m_Code: th
+    m_Code: en
   m_SharedData: {fileID: 11400000, guid: 7f9a22852bb54194190715068eeff026, type: 2}
   m_Metadata:
     m_Items: []
   m_TableData:
   - m_Id: 47851757568
-    m_Localized: "\u0E20\u0E32\u0E29\u0E32\u0E44\u0E17\u0E22"
+    m_Localized: English Text
     m_Metadata:
       m_Items: []
   - m_Id: 47906283520
-    m_Localized: "\u0E40\u0E23\u0E34\u0E48\u0E21\u0E40\u0E01\u0E21"
+    m_Localized: START
     m_Metadata:
       m_Items: []
   - m_Id: 10319098273792
-    m_Localized: "\u0E2D\u0E2D\u0E01"
+    m_Localized: EXIT
     m_Metadata:
       m_Items: []
   - m_Id: 40933780348928
-    m_Localized: "\u0E15\u0E31\u0E49\u0E07\u0E04\u0E48\u0E32"
+    m_Localized: OPTION
     m_Metadata:
       m_Items: []
   - m_Id: 43812696088576
-    m_Localized: "\u0E14\u0E33\u0E40\u0E19\u0E34\u0E19\u0E01\u0E32\u0E23\u0E15\u0E48\u0E2D"
+    m_Localized: CONTINUE
+    m_Metadata:
+      m_Items: []
+  - m_Id: 554055704240128
+    m_Localized: 
+    m_Metadata:
+      m_Items: []
+  - m_Id: 554055708434432
+    m_Localized: ModeBuilder
+    m_Metadata:
+      m_Items: []
+  - m_Id: 554055708434433
+    m_Localized: ModeViewer
+    m_Metadata:
+      m_Items: []
+  - m_Id: 558645375918080
+    m_Localized: ModeBuilder
+    m_Metadata:
+      m_Items: []
+  - m_Id: 558645417861120
+    m_Localized: ModeViewer
     m_Metadata:
       m_Items: []
   references:

@@ -35,6 +35,30 @@ MonoBehaviour:
     m_Key: UI_MENU_CONTINUE
     m_Metadata:
       m_Items: []
+  - m_Id: 554055658102784
+    m_Key: New Entry
+    m_Metadata:
+      m_Items: []
+  - m_Id: 554055704240128
+    m_Key: 
+    m_Metadata:
+      m_Items: []
+  - m_Id: 554055708434432
+    m_Key: ROLE_BUILDER
+    m_Metadata:
+      m_Items: []
+  - m_Id: 554055708434433
+    m_Key: ROLE_VIEWER
+    m_Metadata:
+      m_Items: []
+  - m_Id: 558645375918080
+    m_Key: MODE_BUILDER
+    m_Metadata:
+      m_Items: []
+  - m_Id: 558645417861120
+    m_Key: MODE_VIEWER
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:
