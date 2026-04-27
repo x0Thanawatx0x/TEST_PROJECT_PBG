@@ -6,7 +6,7 @@ public class MainMenu : MonoBehaviour
     // ▶️ เริ่มเกม
     public void StartGame()
     {
-        SceneManager.LoadScene("GameScene"); // เปลี่ยนชื่อ Scene ตามของจริง
+        SceneManager.LoadScene("MainGame"); // เปลี่ยนชื่อ Scene ตามของจริง
     }
 
     // ⚙️ ตั้งค่า

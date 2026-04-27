@@ -12,6 +12,8 @@ public class ToolManager : MonoBehaviour
 
     [Header("Current Status")]
     public BuildTool currentTool = BuildTool.None;
+    public int furnitureIndex = 0;
+    public int natureIndex = 0;
 
     [Header("UI Setup")]
     public List<Button> toolButtons;
@@ -19,7 +21,6 @@ public class ToolManager : MonoBehaviour
     [Header("Highlight Settings")]
     public Vector3 normalScale = Vector3.one;
     public Vector3 selectedScale = new Vector3(1.2f, 1.2f, 1.2f);
-
     public Color normalColor = Color.white;
     public Color selectedColor = Color.green;
 
@@ -31,31 +32,34 @@ public class ToolManager : MonoBehaviour
             if (toolButtons[i] != null)
                 toolButtons[i].onClick.AddListener(() => SelectTool(index));
         }
-
         UpdateButtonVisual();
     }
 
     void Update()
     {
-        // กด 1–7 เลือก Tool
         for (int i = 1; i <= 7; i++)
         {
             if (Input.GetKeyDown(KeyCode.Alpha0 + i))
                 SelectTool(i);
         }
 
-        // ESC = ยกเลิก
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Escape))
             SelectTool(0);
     }
 
     public void SelectTool(int index)
     {
-        currentTool = (BuildTool)index;
-
+        BuildTool selected = (BuildTool)index;
+        if (currentTool == selected)
+        {
+            if (currentTool == BuildTool.Furniture) furnitureIndex++;
+            else if (currentTool == BuildTool.Nature) natureIndex++;
+        }
+        else
+        {
+            currentTool = selected;
+        }
         UpdateButtonVisual();
-
-        Debug.Log("เลือก: " + currentTool);
     }
 
     void UpdateButtonVisual()
@@ -63,9 +67,7 @@ public class ToolManager : MonoBehaviour
         for (int i = 0; i < toolButtons.Count; i++)
         {
             if (toolButtons[i] == null) continue;
-
             Image img = toolButtons[i].GetComponent<Image>();
-
             if ((int)currentTool == i + 1)
             {
                 toolButtons[i].transform.localScale = selectedScale;
