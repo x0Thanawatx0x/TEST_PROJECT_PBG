@@ -566,27 +566,38 @@ MonoBehaviour:
     m_Bits: 8
   buildableLayer:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 192
   gridSize: 1
   toolManager: {fileID: 25014905}
-  housePrefab: {fileID: 1015765813972489374, guid: b3c149af7e809cd4ea9e21808c40da35, type: 3}
-  housePreview: {fileID: 119148411988037888, guid: 252597378d0d51f41b88693fc11be211, type: 3}
+  rotationGizmoPrefab: {fileID: 7948625467911865119, guid: 212a18d51718dc14f99bc3522bf22250, type: 3}
+  gizmoVerticalOffset: 0.2
+  gizmoSizeMultiplier: 0.2
+  highlightColor: {r: 0, g: 1, b: 0.9895792, a: 0.5}
+  liftHeight: 0.1
+  housePrefab: {fileID: 2833249011128094447, guid: 96fd0508b19789d4ba3f6a6e7d2c45e0, type: 3}
+  housePreview: {fileID: 7920476332388903417, guid: c2a432b509e10614b9580589f6383068, type: 3}
   roadLayerIndex: 1
-  paintOpacity: 1
+  grassLayerIndex: 0
   furniturePrefabs:
   - {fileID: 5906347007281320533, guid: 7b0b2a2971983594bb65abeccb3cb09a, type: 3}
   - {fileID: 4300530472821323294, guid: 7564ffc11da2ded4189463e6ef8dcd45, type: 3}
   furniturePreviews:
   - {fileID: 1001928511904406806, guid: 3cdca954e19615a43a99a9add8de069f, type: 3}
   - {fileID: 5984261455155167116, guid: 24e215ba027dcbc4097b69d128decb1c, type: 3}
+  wallPrefab: {fileID: 6482413482852768160, guid: 9193faa61d84f9a4bac2c9bc22c7e6e4, type: 3}
+  pillarPrefab: {fileID: 6164850994072908901, guid: e448ebbe80a7fb345a8bc735c0ebf40f, type: 3}
   naturePrefabs:
-  - {fileID: 5795024682771232959, guid: d015812f1ace6e44698b9b01d10a9511, type: 3}
+  - {fileID: 5221087188873595644, guid: a28d8817a7751604a8b01b8b7fcb9e6d, type: 3}
   naturePreviews:
-  - {fileID: 4360795764873365923, guid: 88cb4cdb88cb4ad4280fbf3d9ddf8d5a, type: 3}
+  - {fileID: 5440374315976125496, guid: 0833b57f2743225468609c03a64d8574, type: 3}
   terrain: {fileID: 1470743128}
-  brushSize: 2
-  moldSpeed: 10
-  pondPreview: {fileID: 5128611033920047231, guid: df55ec0bceea69941b48bd8fa908ae6d, type: 3}
+  brushSize: 1
+  minBrushSize: 0.5
+  maxBrushSize: 10
+  brushStep: 1.5
+  moldSpeed: 5
+  pondPreview: {fileID: 142757941496720206, guid: fc0739ce88136c04ea8d0768e062cc3b, type: 3}
+  brushInputDelay: 0.3
 --- !u!4 &317732847
 Transform:
   m_ObjectHideFlags: 0
@@ -1034,7 +1045,7 @@ Transform:
   m_GameObject: {fileID: 549321262}
   serializedVersion: 2
   m_LocalRotation: {x: 0.017988855, y: 0.03358825, z: -0.0006144506, w: 0.9992737}
-  m_LocalPosition: {x: 1.5463867, y: -0.20422995, z: -10.140572}
+  m_LocalPosition: {x: 2.6417542, y: -0.20429039, z: -10.214279}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1237,7 +1248,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 550481340}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 478, y: 18, z: 354}
   m_LocalScale: {x: 101.69124, y: 101.69124, z: 101.69124}
   m_ConstrainProportionsScale: 0
@@ -3498,7 +3509,7 @@ Transform:
   m_GameObject: {fileID: 1576595370}
   serializedVersion: 2
   m_LocalRotation: {x: 0.017988855, y: 0.03358825, z: -0.0006144506, w: 0.9992737}
-  m_LocalPosition: {x: 1.5463867, y: -0.20422995, z: -10.140572}
+  m_LocalPosition: {x: 2.6417542, y: -0.20429039, z: -10.214279}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
