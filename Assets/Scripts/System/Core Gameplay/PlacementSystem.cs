@@ -13,16 +13,16 @@ public class PlacementSystem : MonoBehaviour
     [SerializeField] private GameObject scalingGizmoPrefab;
     [SerializeField] public float gizmoVerticalOffset = 0.5f;
     [SerializeField] private float scaleSensitivity = 2f;
-    [SerializeField] private float rotationSensitivity = 150f; // ✅ ปรับความเร็วการหมุนใน Inspector ได้
+    [SerializeField] private float rotationSensitivity = 150f;
 
-    [Header("Gizmo Size Control")]
-    // ✅ ปรับขนาด Gizmo รวมได้จาก Inspector (เช่น 0.8 เล็กขยับเข้าใกล้บ้าน, 1.2 ใหญ่ขยับออก)
+    [Header("Gizmo Visual Control")]
     [SerializeField] public float gizmoSizeMultiplier = 1.0f;
+    [SerializeField] private float rotateDetectionRange = 0.25f;
 
     private GameObject activeGizmo;
     private string currentDraggingAxis = "";
 
-    private Transform axisX, axisY, axisZ, axisUniform, axisRotate; // ✅ เพิ่มตัวแปรแกนหมุน
+    private Transform axisX, axisY, axisZ, axisUniform, axisRotate;
 
     [Header("Edit Mode Settings")]
     [SerializeField] private Color highlightColor = new Color(1, 0.9f, 0, 0.5f);
@@ -65,13 +65,13 @@ public class PlacementSystem : MonoBehaviour
     [SerializeField] private float moldSpeed = 5f;
     [SerializeField] private GameObject pondPreview;
 
-    [Header("Brush Timer Settings")]
-    [SerializeField] private float brushInputDelay = 0.3f;
-    private float brushTimer = 0f;
-    private bool isAdjustingBrush = false;
-
     private Camera mainCam;
     private float[,] originalHeights;
+
+    // สำหรับเช็คสถานะการปรับขนาดหัวแปรง
+    private bool isAdjustingBrush = false;
+    private float brushTimer = 0f;
+    private float brushInputDelay = 0.5f;
 
     void Start()
     {
@@ -90,7 +90,9 @@ public class PlacementSystem : MonoBehaviour
             axisY = activeGizmo.transform.Find("Axis_Y");
             axisZ = activeGizmo.transform.Find("Axis_Z");
             axisUniform = activeGizmo.transform.Find("Axis_Uniform");
-            axisRotate = activeGizmo.transform.Find("Axis_Rotate"); // ✅ ลิงก์แกนหมุนจาก Prefab
+            axisRotate = activeGizmo.transform.Find("Axis_Rotate");
+
+            if (axisRotate) axisRotate.gameObject.SetActive(false);
         }
 
         for (int i = 0; i < furniturePreviews.Count; i++) if (furniturePreviews[i]) furniturePreviews[i] = Instantiate(furniturePreviews[i]);
@@ -102,7 +104,7 @@ public class PlacementSystem : MonoBehaviour
     void Update()
     {
         if (toolManager == null) return;
-        if (isEditing && selectedObject != null) { HandleGizmoInteraction(); return; }
+        if (isEditing && selectedObject != null) { HandleSmartInteraction(); return; }
 
         HandleBrushSizeButtons();
         HandleObjectSelection();
@@ -120,59 +122,62 @@ public class PlacementSystem : MonoBehaviour
         }
     }
 
-    // ================= [ Edit Mode Logic ] =================
-
-    void HandleObjectSelection()
-    {
-        if (Input.GetMouseButtonDown(0))
-        {
-            Ray ray = mainCam.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, buildableLayer)) StartEditing(hit.collider.gameObject);
-        }
-    }
-
+    // ฟังก์ชันเริ่มต้นการแก้ไข (ทำให้ Object อยู่ในสถานะถูกเลือก)
     void StartEditing(GameObject obj)
     {
+        if (isEditing) StopEditing();
+
         selectedObject = obj;
         isEditing = true;
         lastGroundY = selectedObject.transform.position.y;
-        if (activeGizmo) { activeGizmo.SetActive(true); UpdateGizmoPosition(); }
+
         Renderer r = selectedObject.GetComponentInChildren<Renderer>();
         if (r != null) { originalColor = r.material.color; r.material.color = highlightColor; }
+
+        if (activeGizmo)
+        {
+            activeGizmo.SetActive(true);
+            UpdateGizmoPosition();
+        }
     }
 
-    void UpdateGizmoPosition()
-    {
-        if (activeGizmo == null || selectedObject == null) return;
-
-        // วางตำแหน่ง Gizmo และหมุนตาม Object (ยกเว้นตอนหมุนเอง จะได้ไม่สั่น)
-        activeGizmo.transform.position = selectedObject.transform.position + Vector3.up * gizmoVerticalOffset;
-        activeGizmo.transform.rotation = selectedObject.transform.rotation;
-
-        // ✅ คำนวณขนาดจาก Scale ของ Object และคูณด้วย SizeMultiplier จาก Inspector
-        Vector3 objScale = selectedObject.transform.localScale;
-        float baseScale = (objScale.x + objScale.z) / 2f;
-        activeGizmo.transform.localScale = Vector3.one * (baseScale * gizmoSizeMultiplier);
-    }
-
-    void HandleGizmoInteraction()
+    void HandleSmartInteraction()
     {
         Ray ray = mainCam.ScreenPointToRay(Input.mousePosition);
+        Vector3 mouseDelta = Input.mousePosition - lastMousePos;
+
+        if (activeGizmo && axisRotate && currentDraggingAxis == "")
+        {
+            if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity))
+            {
+                float currentRadius = (selectedObject.transform.localScale.x + selectedObject.transform.localScale.z) / 2f * gizmoSizeMultiplier;
+                float distFromCenter = Vector3.Distance(hit.point, activeGizmo.transform.position);
+                bool isNearEdge = Mathf.Abs(distFromCenter - currentRadius) < rotateDetectionRange;
+                axisRotate.gameObject.SetActive(isNearEdge);
+            }
+            else { axisRotate.gameObject.SetActive(false); }
+        }
+
         if (Input.GetMouseButtonDown(0))
         {
             if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity))
             {
-                if (hit.collider.name.Contains("Axis")) { currentDraggingAxis = hit.collider.name; lastMousePos = Input.mousePosition; }
-                else if (hit.collider.gameObject == selectedObject) { currentDraggingAxis = "Move"; mouseOffset = selectedObject.transform.position - hit.point; mouseOffset.y = 0; }
+                if (hit.collider.name == "Axis_Rotate") { currentDraggingAxis = "Axis_Rotate"; }
+                else if (hit.collider.name.Contains("Axis")) { currentDraggingAxis = hit.collider.name; }
+                else if (hit.collider.gameObject == selectedObject || Vector3.Distance(hit.point, activeGizmo.transform.position) < (activeGizmo.transform.localScale.x * 0.7f))
+                {
+                    currentDraggingAxis = "Move";
+                    mouseOffset = selectedObject.transform.position - hit.point;
+                    mouseOffset.y = 0;
+                }
                 else StopEditing();
             }
         }
+
         if (Input.GetMouseButtonUp(0)) currentDraggingAxis = "";
 
         if (currentDraggingAxis != "")
         {
-            Vector3 mouseDelta = Input.mousePosition - lastMousePos;
-
             if (currentDraggingAxis == "Move")
             {
                 if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayer))
@@ -181,28 +186,52 @@ public class PlacementSystem : MonoBehaviour
                     selectedObject.transform.position = Vector3.Lerp(selectedObject.transform.position, SnapToGrid(hit.point + mouseOffset) + Vector3.up * liftHeight, Time.deltaTime * 25f);
                 }
             }
-            else if (currentDraggingAxis == "Axis_Rotate") // ✅ ระบบหมุน (Rotate)
+            else if (currentDraggingAxis == "Axis_Rotate")
             {
-                // ลากเมาส์ซ้าย-ขวาเพื่อหมุนวัตถุ
-                float rotationAmount = mouseDelta.x * rotationSensitivity * Time.deltaTime;
-                selectedObject.transform.Rotate(Vector3.up, -rotationAmount, Space.World);
+                float rot = mouseDelta.x * rotationSensitivity * Time.deltaTime;
+                selectedObject.transform.Rotate(Vector3.up, -rot, Space.World);
+                axisRotate.gameObject.SetActive(true);
             }
-            else // ระบบปรับขนาด (Scaling)
-            {
-                float delta = (mouseDelta.x + mouseDelta.y) * scaleSensitivity * Time.deltaTime;
-                if (currentDraggingAxis == "Axis_X") selectedObject.transform.localScale += new Vector3(delta, 0, 0);
-                else if (currentDraggingAxis == "Axis_Y") selectedObject.transform.localScale += new Vector3(0, delta, 0);
-                else if (currentDraggingAxis == "Axis_Z") selectedObject.transform.localScale += new Vector3(0, 0, delta);
-                else if (currentDraggingAxis == "Axis_Uniform") selectedObject.transform.localScale += Vector3.one * delta;
-
-                Vector3 s = selectedObject.transform.localScale;
-                selectedObject.transform.localScale = new Vector3(Mathf.Max(s.x, 0.1f), Mathf.Max(s.y, 0.1f), Mathf.Max(s.z, 0.1f));
-            }
+            else { HandleScaling(mouseDelta); }
 
             UpdateGizmoPosition();
-            lastMousePos = Input.mousePosition;
         }
+        lastMousePos = Input.mousePosition;
         if (Input.GetMouseButtonDown(1)) StopEditing();
+    }
+
+    void UpdateGizmoPosition()
+    {
+        if (activeGizmo == null || selectedObject == null) return;
+        Renderer r = selectedObject.GetComponentInChildren<Renderer>();
+        Vector3 center = (r != null) ? r.bounds.center : selectedObject.transform.position;
+
+        activeGizmo.transform.position = center + Vector3.up * gizmoVerticalOffset;
+        activeGizmo.transform.rotation = selectedObject.transform.rotation;
+
+        float baseS = (selectedObject.transform.localScale.x + selectedObject.transform.localScale.z) / 2f;
+        activeGizmo.transform.localScale = Vector3.one * (baseS * gizmoSizeMultiplier);
+    }
+
+    void HandleScaling(Vector3 delta)
+    {
+        float s = (delta.x + delta.y) * scaleSensitivity * Time.deltaTime;
+        if (currentDraggingAxis == "Axis_X") selectedObject.transform.localScale += new Vector3(s, 0, 0);
+        else if (currentDraggingAxis == "Axis_Y") selectedObject.transform.localScale += new Vector3(0, s, 0);
+        else if (currentDraggingAxis == "Axis_Z") selectedObject.transform.localScale += new Vector3(0, 0, s);
+        else if (currentDraggingAxis == "Axis_Uniform") selectedObject.transform.localScale += Vector3.one * s;
+        Vector3 ls = selectedObject.transform.localScale;
+        selectedObject.transform.localScale = new Vector3(Mathf.Max(ls.x, 0.1f), Mathf.Max(ls.y, 0.1f), Mathf.Max(ls.z, 0.1f));
+    }
+
+    void HandleObjectSelection()
+    {
+        if (Input.GetMouseButtonDown(0))
+        {
+            Ray ray = mainCam.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, buildableLayer))
+                StartEditing(hit.collider.gameObject);
+        }
     }
 
     void StopEditing()
@@ -216,17 +245,52 @@ public class PlacementSystem : MonoBehaviour
         currentDraggingAxis = ""; if (activeGizmo) activeGizmo.SetActive(false); selectedObject = null; isEditing = false;
     }
 
-    // ================= [ ส่วน Logic อื่นๆ คงเดิม ] =================
+    // ================= [ แก้ไขส่วนการสร้างรั้ว ให้ Edit ได้ ] =================
+    void BuildWallSegment(Vector3 start, Vector3 end)
+    {
+        Vector3 dir = end - start;
+        if (dir != Vector3.zero)
+        {
+            Quaternion wallRot = Quaternion.LookRotation(dir);
+            GameObject wall = Instantiate(wallPrefab, start + (dir / 2f), wallRot);
+
+            // ตั้งค่า Scale ตามความยาว
+            Vector3 scale = wall.transform.localScale;
+            scale.z = dir.magnitude;
+            wall.transform.localScale = scale;
+
+            // ✅ หัวใจสำคัญ: ตั้งค่า Layer ให้รั้วสามารถถูกคลิกเพื่อแก้ไขได้
+            wall.layer = LayerMaskToLayer(buildableLayer);
+
+            // ✅ เพิ่ม Collider ถ้ายังไม่มี เพื่อให้ Raycast ตรวจจับโดน
+            if (!wall.GetComponent<Collider>())
+            {
+                MeshCollider mc = wall.AddComponent<MeshCollider>();
+                mc.convex = true; // จำเป็นสำหรับการตรวจจับฟิสิกส์บางประเภท
+            }
+        }
+        SpawnPillar(end);
+    }
+
+    void SpawnPillar(Vector3 pos)
+    {
+        if (pillarPrefab == null) return;
+        GameObject pillar = Instantiate(pillarPrefab, pos, Quaternion.identity);
+
+        // ✅ ตั้งค่า Layer และ Collider ให้เสาด้วย
+        pillar.layer = LayerMaskToLayer(buildableLayer);
+        if (!pillar.GetComponent<Collider>()) pillar.AddComponent<BoxCollider>();
+    }
+
+    // ================= [ ส่วนที่เหลือคงเดิม ] =================
     void HandleBrushSizeButtons() { if (Input.GetKey(KeyCode.Equals) || Input.GetKey(KeyCode.KeypadPlus)) { brushSize += brushStep * Time.deltaTime * 5f; ResetBrushTimer(); } if (Input.GetKey(KeyCode.Minus) || Input.GetKey(KeyCode.KeypadMinus)) { brushSize -= brushStep * Time.deltaTime * 5f; ResetBrushTimer(); } brushSize = Mathf.Clamp(brushSize, minBrushSize, maxBrushSize); if (isAdjustingBrush) { brushTimer -= Time.deltaTime; if (brushTimer <= 0) isAdjustingBrush = false; } }
     void ResetBrushTimer() { isAdjustingBrush = true; brushTimer = brushInputDelay; }
     void HandleRoadPainting() { Ray ray = mainCam.ScreenPointToRay(Input.mousePosition); if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayer)) { if (pondPreview) { pondPreview.SetActive(true); pondPreview.transform.position = hit.point + Vector3.up * 0.1f; pondPreview.transform.localScale = new Vector3(brushSize * 2, 1, brushSize * 2); } if (Input.GetMouseButton(0)) PaintTerrain(hit.point, roadLayerIndex); } }
-    void PaintTerrain(Vector3 worldPos, int layerIdx) { if (!terrain) return; TerrainData td = terrain.terrainData; int mapX = Mathf.RoundToInt((worldPos.x - terrain.transform.position.x) / td.size.x * td.alphamapWidth); int mapZ = Mathf.RoundToInt((worldPos.z - terrain.transform.position.z) / td.size.z * td.alphamapHeight); int radius = Mathf.RoundToInt(brushSize); int startX = Mathf.Clamp(mapX - radius, 0, td.alphamapWidth - 1); int startZ = Mathf.Clamp(mapZ - radius, 0, td.alphamapHeight - 1); int width = Mathf.Clamp(radius * 2, 1, td.alphamapWidth - startX); int height = Mathf.Clamp(radius * 2, 1, td.alphamapHeight - startZ); float[,,] maps = td.GetAlphamaps(startX, startZ, width, height); for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) for (int k = 0; k < td.alphamapLayers; k++) maps[y, x, k] = (k == layerIdx) ? 1f : 0f; td.SetAlphamaps(startX, startZ, maps); }
+    void PaintTerrain(Vector3 worldPos, int layerIdx) { if (!terrain) return; TerrainData td = terrain.terrainData; int mapX = Mathf.RoundToInt((worldPos.x - terrain.transform.position.x) / td.size.x * td.alphamapWidth); int mapZ = Mathf.RoundToInt((worldPos.z - terrain.transform.position.z) / td.size.z * td.alphamapHeight); int radius = Mathf.RoundToInt(brushSize); int startX = Mathf.Clamp(mapX - radius, 0, td.alphamapWidth - 1); int startZ = Mathf.Clamp(mapZ - radius, 0, td.alphamapHeight - 1); int w = Mathf.Clamp(radius * 2, 1, td.alphamapWidth - startX); int h = Mathf.Clamp(radius * 2, 1, td.alphamapHeight - startZ); float[,,] maps = td.GetAlphamaps(startX, startZ, w, h); for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) for (int k = 0; k < td.alphamapLayers; k++) maps[y, x, k] = (k == layerIdx) ? 1f : 0f; td.SetAlphamaps(startX, startZ, maps); }
     void HandlePondSystem() { Ray ray = mainCam.ScreenPointToRay(Input.mousePosition); if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayer)) { if (pondPreview) { pondPreview.SetActive(true); pondPreview.transform.position = hit.point + Vector3.up * 0.1f; pondPreview.transform.localScale = new Vector3(brushSize * 2, 1, brushSize * 2); } if (Input.GetMouseButton(0)) ModifyTerrain(hit.point); } }
     void ModifyTerrain(Vector3 point) { if (!terrain) return; TerrainData td = terrain.terrainData; int mapX = Mathf.RoundToInt((point.x - terrain.transform.position.x) / td.size.x * td.heightmapResolution); int mapZ = Mathf.RoundToInt((point.z - terrain.transform.position.z) / td.size.z * td.heightmapResolution); int r = (int)brushSize; int startX = Mathf.Clamp(mapX - r, 0, td.heightmapResolution - 1); int startZ = Mathf.Clamp(mapZ - r, 0, td.heightmapResolution - 1); int w = Mathf.Clamp(r * 2, 1, td.heightmapResolution - startX); int h = Mathf.Clamp(r * 2, 1, td.heightmapResolution - startZ); float[,] heights = td.GetHeights(startX, startZ, w, h); for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) heights[y, x] -= moldSpeed * 0.01f * Time.deltaTime; td.SetHeights(startX, startZ, heights); }
     void HandleWallSplineSystem() { Ray ray = mainCam.ScreenPointToRay(Input.mousePosition); if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayer)) { Vector3 currentSnapPos = SnapToGrid(hit.point); if (pondPreview) { pondPreview.SetActive(true); pondPreview.transform.position = currentSnapPos + Vector3.up * 0.1f; MeshRenderer ren = pondPreview.GetComponentInChildren<MeshRenderer>(); if (ren != null) ren.material.color = IsOccupied(currentSnapPos) ? Color.red : Color.green; } if (Input.GetMouseButtonDown(0) && !IsOccupied(currentSnapPos)) { isDrawingWall = true; wallPoints.Clear(); wallPoints.Add(currentSnapPos); SpawnPillar(currentSnapPos); } if (isDrawingWall && Input.GetMouseButton(0)) { Vector3 lastPoint = wallPoints[wallPoints.Count - 1]; if (Vector3.Distance(lastPoint, currentSnapPos) >= gridSize && !IsOccupied(currentSnapPos)) { BuildWallSegment(lastPoint, currentSnapPos); wallPoints.Add(currentSnapPos); } } if (Input.GetMouseButtonUp(0)) isDrawingWall = false; } }
     bool IsOccupied(Vector3 pos) { return Physics.CheckSphere(pos, 0.2f, buildableLayer); }
-    void BuildWallSegment(Vector3 start, Vector3 end) { Vector3 dir = end - start; if (dir != Vector3.zero) { Quaternion wallRot = Quaternion.LookRotation(dir); GameObject wall = Instantiate(wallPrefab, start + (dir / 2f), wallRot); Vector3 scale = wall.transform.localScale; scale.z = dir.magnitude; wall.transform.localScale = scale; wall.layer = LayerMaskToLayer(buildableLayer); if (!wall.GetComponent<Collider>()) wall.AddComponent<MeshCollider>(); } SpawnPillar(end); }
-    void SpawnPillar(Vector3 pos) { if (pillarPrefab == null) return; GameObject pillar = Instantiate(pillarPrefab, pos, Quaternion.identity); pillar.layer = LayerMaskToLayer(buildableLayer); if (!pillar.GetComponent<Collider>()) pillar.AddComponent<BoxCollider>(); }
     void HandleSinglePlacement(GameObject prefab, GameObject preview) { if (!prefab || !preview) return; Ray ray = mainCam.ScreenPointToRay(Input.mousePosition); if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayer)) { preview.SetActive(true); Vector3 pos = SnapToGrid(hit.point); preview.transform.position = pos; if (Input.GetMouseButtonDown(0)) SpawnObject(prefab, pos); } }
     void HandleMultiPlacement(List<GameObject> prefabs, List<GameObject> previews, int subIndex) { if (prefabs.Count == 0 || previews.Count == 0) return; int index = subIndex % prefabs.Count; Ray ray = mainCam.ScreenPointToRay(Input.mousePosition); if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayer)) { GameObject preview = previews[index]; if (preview) { preview.SetActive(true); Vector3 pos = SnapToGrid(hit.point); preview.transform.position = pos; if (Input.GetMouseButtonDown(0)) SpawnObject(prefabs[index], pos); } } }
     void SpawnObject(GameObject prefab, Vector3 pos) { GameObject newObj = Instantiate(prefab, pos, Quaternion.identity); newObj.layer = LayerMaskToLayer(buildableLayer); if (!newObj.GetComponent<Collider>()) newObj.AddComponent<BoxCollider>(); }
