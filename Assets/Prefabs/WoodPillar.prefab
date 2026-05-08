@@ -11,7 +11,8 @@ GameObject:
   - component: {fileID: 1909957203172127526}
   - component: {fileID: 5461917275100032895}
   - component: {fileID: 2900495668613524380}
-  m_Layer: 0
+  - component: {fileID: 7147951122920188287}
+  m_Layer: 7
   m_Name: Wood_large_1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -86,6 +87,27 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &7147951122920188287
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3058745571770195731}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.19899303, y: 0.9152146, z: 0.18808828}
+  m_Center: {x: -0.0063768923, y: 0.43882337, z: 0.006483741}
 --- !u!1 &6164850994072908901
 GameObject:
   m_ObjectHideFlags: 0
@@ -95,7 +117,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8906944410413940444}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: WoodPillar
   m_TagString: Untagged
   m_Icon: {fileID: 0}

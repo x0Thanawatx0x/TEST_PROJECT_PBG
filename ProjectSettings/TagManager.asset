@@ -5,6 +5,9 @@ TagManager:
   serializedVersion: 3
   tags:
   - Buildable
+  - House
+  - Furniture
+  - TinyHouse
   layers:
   - Default
   - TransparentFX
