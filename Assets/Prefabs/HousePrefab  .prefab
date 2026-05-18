@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5697702937790108480}
   - component: {fileID: 999680349187888116}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: 'HousePrefab  '
   m_TagString: TinyHouse
   m_Icon: {fileID: 0}
@@ -65,7 +65,7 @@ GameObject:
   - component: {fileID: 7754813765226154984}
   - component: {fileID: 2684559817420188795}
   - component: {fileID: 2994408189454817968}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: House_01
   m_TagString: TinyHouse
   m_Icon: {fileID: 0}

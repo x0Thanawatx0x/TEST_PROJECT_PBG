@@ -7,10 +7,14 @@ public class CM_Viewer : MonoBehaviour
     public float sprintSpeed = 8f;
     public float mouseSensitivity = 2f;
 
-    [Header("Physics")]
-    public float gravity = -9.81f;
+    [Tooltip("ความสูงของการกระโดด")]
+    public float jumpHeight = 1.5f;
+
+    [Header("Physics & Ground Check")]
+    public Transform groundCheckPivot; // ✅ ลาก Object "ใต้เท้า" มาใส่ที่นี่ใน Inspector
     public float groundCheckDistance = 0.3f;
     public LayerMask groundLayer;
+    public float gravity = -9.81f;
 
     [Header("Leaning (Q/E)")]
     public float leanAngle = 15f;
@@ -24,6 +28,7 @@ public class CM_Viewer : MonoBehaviour
 
     void Start()
     {
+        // อ้างอิง CharacterController จาก Parent ตามโครงสร้างเดิม
         controller = GetComponentInParent<CharacterController>();
 
         Cursor.lockState = CursorLockMode.Locked;
@@ -38,7 +43,6 @@ public class CM_Viewer : MonoBehaviour
         {
             Look();
             Move();
-            // ✅ นำ HandleZoom() ออกไปแล้ว
         }
         HandleCursor();
     }
@@ -68,17 +72,41 @@ public class CM_Viewer : MonoBehaviour
         float v = Input.GetAxis("Vertical");
         float speed = Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : moveSpeed;
 
+        // ทิศทางการเคลื่อนที่แนวราบ
         Vector3 move = transform.parent.forward * v + transform.parent.right * h;
 
-        bool isGrounded = Physics.Raycast(transform.parent.position, Vector3.down, groundCheckDistance, groundLayer);
-        if (isGrounded && yVelocity < 0)
-            yVelocity = -2f;
+        // ✅ ระบบเช็คพื้นโดยใช้ Pivot Point
+        // ถ้าคุณปิ๊บไม่ได้ลาก Pivot มาใส่ จะใช้ตำแหน่ง parent.position แทนเพื่อกัน Error
+        Vector3 checkPos = (groundCheckPivot != null) ? groundCheckPivot.position : transform.parent.position;
+        bool isGrounded = Physics.Raycast(checkPos, Vector3.down, groundCheckDistance, groundLayer);
 
+        // วาดเส้น Debug เพื่อช่วยให้เห็นจุดเช็คพื้นในหน้า Scene (เขียว = พื้น, แดง = ลอย)
+        Debug.DrawRay(checkPos, Vector3.down * groundCheckDistance, isGrounded ? Color.green : Color.red);
+
+        if (isGrounded && yVelocity < 0)
+        {
+            yVelocity = -2f; // แรงกดตัวละครให้ติดพื้น
+        }
+
+        // ✅ ระบบกระโดด (Space Bar)
+        if (Input.GetButtonDown("Jump") && isGrounded)
+        {
+            // สูตรคำนวณแรงส่ง v = sqrt(h * -2 * g)
+            yVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            Debug.Log("🚀 Jump!");
+        }
+
+        // แรงโน้มถ่วง
         yVelocity += gravity * Time.deltaTime;
-        move.y = yVelocity;
+
+        // รวมแรงเคลื่อนที่ทั้งหมด
+        Vector3 finalMove = move * speed;
+        finalMove.y = yVelocity;
 
         if (controller != null)
-            controller.Move(move * speed * Time.deltaTime);
+        {
+            controller.Move(finalMove * Time.deltaTime);
+        }
     }
 
     void HandleCursor()

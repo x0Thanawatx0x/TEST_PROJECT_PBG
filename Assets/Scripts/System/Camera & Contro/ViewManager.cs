@@ -4,7 +4,7 @@ using Unity.Cinemachine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.Localization.Components;
-using UnityEngine.Localization.Settings; // ✅ เพิ่มเพื่อใช้คำสั่งเปลี่ยนภาษาผ่านคีย์บอร์ด
+using UnityEngine.Localization.Settings;
 
 public class ViewManager : MonoBehaviour
 {
@@ -32,6 +32,11 @@ public class ViewManager : MonoBehaviour
     [Header("Tool UI")]
     public GameObject toolUI;
 
+    [Header("Dependencies to Reset")]
+    [SerializeField] private ToolManager toolManager;
+    [SerializeField] private PlacementSystem placementSystem;
+    [SerializeField] private PhotoModeManager photoMode; // ✅ เชื่อมต่อเพื่อเช็คว่ากำลังถ่ายรูปอยู่ไหม
+
     [Header("UI Text (Editable)")]
     public string builderText = "โหมด: Builder 🏠";
     public string viewerText = "โหมด: Viewer 🚶";
@@ -54,19 +59,25 @@ public class ViewManager : MonoBehaviour
 
     void Update()
     {
-        // ⌨️ กด V เพื่อสลับโหมด
+        // ✅ กฎเหล็ก: ถ้าอยู่ใน Photo Mode จะกด V สลับโหมดไม่ได้ (เพื่อป้องกัน UI ทับซ้อน)
+        // แต่ยังสามารถขยับตัว/ขยับกล้องในโหมดนั้นๆ เพื่อถ่ายรูปได้ปกติ
+        if (photoMode != null && photoMode.isPhotoMode)
+        {
+            return; // หยุดการเช็คปุ่ม V และ L ในเฟรมนี้
+        }
+
+        // ⌨️ กด V เพื่อสลับโหมด (ทำงานเฉพาะตอนไม่ได้เปิดโหมดถ่ายรูป)
         if (Input.GetKeyDown(KeyCode.V) && !isSwitching)
         {
             ToggleMode();
         }
 
-        // ⌨️ ✅ เพิ่มเติม: กด L เพื่อสลับภาษา (Locale) ทันทีโดยไม่ต้องใช้เมาส์
+        // ⌨️ กด L เพื่อสลับภาษา
         if (Input.GetKeyDown(KeyCode.L))
         {
             LocaleSelector selector = Object.FindFirstObjectByType<LocaleSelector>();
             if (selector != null)
             {
-                // สลับ ID ระหว่าง 0 (EN) กับ 1 (TH)
                 int currentID = PlayerPrefs.GetInt("LocaleKey", 0);
                 int nextID = (currentID == 0) ? 1 : 0;
                 selector.ChangeLocale(nextID);
@@ -83,7 +94,6 @@ public class ViewManager : MonoBehaviour
             }
             else
             {
-                // ถ้าปล่อยปุ่ม Ctrl ให้กลับไปล็อกเมาส์เหมือนเดิม
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
             }
@@ -92,6 +102,9 @@ public class ViewManager : MonoBehaviour
 
     public void ToggleMode()
     {
+        // ✅ ป้องกันการกดผ่านปุ่ม UI บนหน้าจอขณะถ่ายรูปด้วย
+        if (photoMode != null && photoMode.isPhotoMode) return;
+
         if (!isSwitching)
             StartCoroutine(SmoothSwitch());
     }
@@ -105,6 +118,8 @@ public class ViewManager : MonoBehaviour
 
         if (currentMode == GameMode.Builder)
         {
+            ResetBuildModeVisuals();
+
             if (builderCam != null)
                 builderCam.Priority = 0;
 
@@ -129,6 +144,19 @@ public class ViewManager : MonoBehaviour
         }
 
         isSwitching = false;
+    }
+
+    private void ResetBuildModeVisuals()
+    {
+        if (toolManager != null)
+        {
+            toolManager.SelectTool(0);
+        }
+
+        if (placementSystem != null)
+        {
+            placementSystem.SendMessage("UpdateToolLogic", SendMessageOptions.DontRequireReceiver);
+        }
     }
 
     IEnumerator MoveCamera(Transform from, Transform to)
@@ -213,7 +241,5 @@ public class ViewManager : MonoBehaviour
                 modeTextLocalizer.StringReference.TableEntryReference = "MODE_VIEWER";
             }
         }
-
-        Debug.Log("โหมด: " + currentMode);
     }
 }

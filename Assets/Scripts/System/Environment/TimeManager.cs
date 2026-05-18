@@ -1,35 +1,29 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using System.Collections;
 
-public class TimeManager : MonoBehaviour,
-    IPointerDownHandler,
-    IPointerUpHandler,
-    IDragHandler
+public class TimeManager : MonoBehaviour
 {
-    [Header("Clock UI")]
-    public RectTransform clockFace;
+    [Header("Slider UI")]
+    public Slider timeSlider;
+
+    [Header("Icon Settings")]
+    public Image timeIcon;
+    public Sprite sunSprite;      // 0.00 - 0.30 (ตอนเช้า)
+    public Sprite eveningSprite;  // 0.31 - 0.65 (ตอนเย็น)
+    public Sprite moonSprite;     // 0.66 - 1.00 (กลางคืน)
+
+    [Header("Clock UI (Optional)")]
     public RectTransform handleAnchor;
 
     [Header("Shadow System")]
     public RectTransform shadowAnchor;
-
     [Tooltip("ความเร็วของเงาตาม")]
     public float shadowSmoothness = 4f;
 
-    [Header("Drag Settings")]
-    public float dragSensitivity = 0.5f;
+    [Header("Smooth Settings")]
     public float rotationSmoothness = 8f;
-    public float inertiaDamping = 3f;      // ✅ หยุดช้าพอดี — ปรับได้ 2-5
-
-    private bool isDragging = false;
-
-    private float accumulatedAngle;
-    private float displayAngle;
-    private float angularVelocity;
-    private Vector2 lastMouseDirection;
-
-    private float _smoothDampVelocity = 0f;
-    private float _lastAngleDelta = 0f;    // ✅ เก็บ delta ล่าสุดไว้ทำ momentum
 
     // =========================
     // SKYBOX (5 STATES ONLY)
@@ -48,88 +42,101 @@ public class TimeManager : MonoBehaviour,
     [Header("Time Logic")]
     [Range(0, 1)]
     public float currentTime;
-
-    private float worldTime;
     public float daySpeed = 0.01f;
+    public bool autoPassTime = true;
 
     [Header("Lighting")]
     public AnimationCurve lightIntensity;
 
+    private float displayTime;
+    private float _smoothTimeVelocity = 0f;
+
     void Start()
     {
-        worldTime = currentTime;
-        accumulatedAngle = 0f;
-        displayAngle = 0f;
+        if (timeSlider != null)
+        {
+            timeSlider.minValue = 0f;
+            timeSlider.maxValue = 1f;
+            timeSlider.value = currentTime;
+            timeSlider.onValueChanged.AddListener(OnSliderValueChanged);
+        }
 
-        UpdateUI();
+        displayTime = currentTime;
 
-        if (shadowAnchor != null)
+        if (shadowAnchor != null && handleAnchor != null)
             shadowAnchor.localRotation = handleAnchor.localRotation;
+
+        UpdateIcon(currentTime);
     }
 
     void Update()
     {
         // =========================
-        // ROTATION SYSTEM
+        // AUTO TIME LOGIC
         // =========================
-        if (!isDragging)
+        if (autoPassTime)
         {
-            // ✅ inertia พาต่อตอนปล่อยมือ แล้วค่อยๆ หยุด
-            angularVelocity = Mathf.Lerp(
-                angularVelocity,
-                0f,
-                Time.deltaTime * inertiaDamping
-            );
-            accumulatedAngle += angularVelocity * Time.deltaTime;
+            currentTime += Time.deltaTime * daySpeed;
+            currentTime = Mathf.Repeat(currentTime, 1f);
+
+            if (timeSlider != null)
+            {
+                timeSlider.onValueChanged.RemoveListener(OnSliderValueChanged);
+                timeSlider.value = currentTime;
+                timeSlider.onValueChanged.AddListener(OnSliderValueChanged);
+            }
         }
 
-        // ✅ display smooth ตาม accumulated
-        displayAngle = Mathf.SmoothDampAngle(
-            displayAngle,
-            accumulatedAngle,
-            ref _smoothDampVelocity,
-            0.04f
-        );
+        displayTime = Mathf.SmoothDamp(displayTime, currentTime, ref _smoothTimeVelocity, 0.05f);
 
         // =========================
-        // TIME CONVERT — องศา → เวลา โดยตรง
+        // UPDATES
         // =========================
-        currentTime = Mathf.Repeat(-accumulatedAngle / 360f, 1f);
+        UpdateSkybox(displayTime);
+        UpdateEnvironment(displayTime);
+        UpdateUI(displayTime);
+        UpdateIcon(currentTime);
+    }
 
-        // =========================
-        // AUTO TIME ALWAYS RUNNING (เฉพาะตอนไม่ได้ drag)
-        // =========================
-        if (!isDragging)
-        {
-            worldTime += Time.deltaTime * daySpeed;
-            worldTime = Mathf.Repeat(worldTime, 1f);
-
-            accumulatedAngle -= daySpeed * Time.deltaTime * 360f;
-        }
-
-        // =========================
-        // SKYBOX SYSTEM
-        // =========================
-        UpdateSkybox(currentTime);
-        UpdateEnvironment(currentTime);
-        UpdateUI();
+    public void OnSliderValueChanged(float value)
+    {
+        currentTime = value;
     }
 
     // =========================
-    // SKYBOX SWITCH (5 STATES — แบ่งเท่ากัน 20% ต่ออัน)
+    // ☀️/🌇/🌙 ICON SYSTEM (ปรับตามช่วงเวลาที่คุณปิ๊บกำหนด)
+    // =========================
+    void UpdateIcon(float t)
+    {
+        if (timeIcon == null || sunSprite == null || eveningSprite == null || moonSprite == null) return;
+
+        // 0 -> 0.30 ตอนเช้า
+        if (t <= 0.30f)
+        {
+            if (timeIcon.sprite != sunSprite) timeIcon.sprite = sunSprite;
+        }
+        // 0.31 -> 0.65 ตอนเย็น
+        else if (t > 0.30f && t <= 0.65f)
+        {
+            if (timeIcon.sprite != eveningSprite) timeIcon.sprite = eveningSprite;
+        }
+        // 0.66 -> 1 เป็นกลางคืน
+        else
+        {
+            if (timeIcon.sprite != moonSprite) timeIcon.sprite = moonSprite;
+        }
+    }
+
+    // =========================
+    // SKYBOX SWITCH (5 STATES)
     // =========================
     void UpdateSkybox(float t)
     {
-        if (t < 0.2f)
-            SetSkybox(morningSkybox);
-        else if (t < 0.4f)
-            SetSkybox(noonSkybox);
-        else if (t < 0.6f)
-            SetSkybox(eveningSkybox);
-        else if (t < 0.8f)
-            SetSkybox(duskSkybox);
-        else
-            SetSkybox(nightSkybox);
+        if (t < 0.2f) SetSkybox(morningSkybox);
+        else if (t < 0.4f) SetSkybox(noonSkybox);
+        else if (t < 0.6f) SetSkybox(eveningSkybox);
+        else if (t < 0.8f) SetSkybox(duskSkybox);
+        else SetSkybox(nightSkybox);
 
         if (Time.frameCount % 10 == 0)
             DynamicGI.UpdateEnvironment();
@@ -141,12 +148,15 @@ public class TimeManager : MonoBehaviour,
             RenderSettings.skybox = mat;
     }
 
-    void UpdateUI()
+    void UpdateUI(float t)
     {
         if (handleAnchor != null)
-            handleAnchor.localRotation = Quaternion.Euler(0, 0, displayAngle);
+        {
+            float targetAngle = -t * 360f;
+            handleAnchor.localRotation = Quaternion.Euler(0, 0, targetAngle);
+        }
 
-        if (shadowAnchor != null)
+        if (shadowAnchor != null && handleAnchor != null)
         {
             shadowAnchor.localRotation = Quaternion.Lerp(
                 shadowAnchor.localRotation,
@@ -156,67 +166,13 @@ public class TimeManager : MonoBehaviour,
         }
     }
 
-    public void OnPointerDown(PointerEventData eventData)
+    void UpdateEnvironment(float t)
     {
-        isDragging = true;
-        _smoothDampVelocity = 0f;
-        angularVelocity = 0f;
-        _lastAngleDelta = 0f;
-
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            clockFace,
-            eventData.position,
-            eventData.pressEventCamera,
-            out Vector2 localPoint
-        );
-
-        lastMouseDirection = localPoint.normalized;
-    }
-
-    public void OnPointerUp(PointerEventData eventData)
-    {
-        isDragging = false;
-
-        // ✅ ส่ง momentum จาก delta สุดท้ายไปให้ inertia
-        angularVelocity = _lastAngleDelta * dragSensitivity * 60f;
-        angularVelocity = Mathf.Clamp(angularVelocity, -720f, 720f);
-    }
-
-    public void OnDrag(PointerEventData eventData)
-    {
-        if (!isDragging) return;
-
-        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            clockFace,
-            eventData.position,
-            eventData.pressEventCamera,
-            out Vector2 localPoint))
-        {
-            Vector2 currentDirection = localPoint.normalized;
-
-            float angleDelta = Vector2.SignedAngle(
-                lastMouseDirection,
-                currentDirection
-            );
-
-            // ✅ ตามเม้าท์ 1:1
-            accumulatedAngle += angleDelta * dragSensitivity;
-
-            // ✅ เก็บ delta ไว้ทำ momentum ตอนปล่อย
-            _lastAngleDelta = angleDelta;
-
-            lastMouseDirection = currentDirection;
-        }
-    }
-
-    void UpdateEnvironment(float time)
-    {
-        float sunAngle = time * 360f - 90f;
-
+        float sunAngle = t * 360f - 90f;
         sunLight.transform.rotation = Quaternion.Euler(sunAngle, 170f, 0);
-        sunLight.color = sunColor.Evaluate(time);
+        sunLight.color = sunColor.Evaluate(t);
 
         if (lightIntensity != null)
-            sunLight.intensity = lightIntensity.Evaluate(time);
+            sunLight.intensity = lightIntensity.Evaluate(t);
     }
 }
