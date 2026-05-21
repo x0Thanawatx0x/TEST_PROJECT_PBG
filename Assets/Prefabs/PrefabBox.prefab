@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 8452049453140335422}
   - component: {fileID: 2706467294030644304}
   - component: {fileID: 2936807076354428989}
-  m_Layer: 7
+  m_Layer: 8
   m_Name: Box
   m_TagString: Furniture
   m_Icon: {fileID: 0}
@@ -131,7 +131,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1974289722309851324}
-  m_Layer: 7
+  m_Layer: 8
   m_Name: PrefabBox
   m_TagString: Furniture
   m_Icon: {fileID: 0}

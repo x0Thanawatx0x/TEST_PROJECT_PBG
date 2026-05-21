@@ -7,7 +7,8 @@ public class ToolManager : MonoBehaviour
     public enum BuildTool
     {
         None = 0, House = 1, Road = 2, Furniture = 3,
-        Wall = 4, Nature = 5, Pond = 6, Eraser = 7
+        Wall = 4, Nature = 5, Pond = 6, Eraser = 7,
+        Mountain = 8 // เพิ่มประเภทเครื่องมือที่ 8 สำหรับดึงภูเขา
     }
 
     [Header("Current Status")]
@@ -18,7 +19,7 @@ public class ToolManager : MonoBehaviour
     public int natureIndex = 0;
 
     [Header("UI Setup")]
-    public List<Button> toolButtons;
+    public List<Button> toolButtons; // อย่าลืมใส่ปุ่มชิ้นที่ 8 (ภูเขา) เข้ามาใน List บน Inspector นะครับปิ๊บ
 
     [Header("Highlight Settings (Legacy - Still kept for safety)")]
     public Vector3 normalScale = Vector3.one;
@@ -39,11 +40,17 @@ public class ToolManager : MonoBehaviour
 
     void Update()
     {
-        // Shortcut Keys 1-7
-        for (int i = 1; i <= 7; i++)
+        // Shortcut Keys 1-8 (ขยายจาก 7 เป็น 8 เพื่อให้ดักจับปุ่มเลข 8 อัตโนมัติ)
+        for (int i = 1; i <= 8; i++)
         {
             if (Input.GetKeyDown(KeyCode.Alpha0 + i))
                 SelectTool(i);
+        }
+
+        // ดักจับเพิ่มเติมสำหรับฝั่ง Keypad เลข 8 ตัวขวา เพื่อความสะดวกของผู้เล่น
+        if (Input.GetKeyDown(KeyCode.Keypad8))
+        {
+            SelectTool(8);
         }
 
         if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Escape))
@@ -73,15 +80,13 @@ public class ToolManager : MonoBehaviour
         {
             if (toolButtons[i] == null) continue;
 
-            // ✅ ดึง Animator จากปุ่มมาใช้งาน
+            // ดึง Animator จากปุ่มมาใช้งาน
             Animator anim = toolButtons[i].GetComponent<Animator>();
             bool isSelected = (int)currentTool == i + 1;
 
             if (anim != null)
             {
-                // ✅ ส่งค่า IsSelected เข้าไปใน Animator 
-                // ถ้า True อนิเมชั่นจะเล่นไปข้างหน้า (เฟรม 0 -> สุด)
-                // ถ้า False อนิเมชั่นจะเล่นย้อนกลับ (สุด -> เฟรม 0) ตามที่ตั้งค่าใน Animator Controller
+                // ส่งค่า IsSelected เข้าไปใน Animator 
                 anim.SetBool("IsSelected", isSelected);
             }
             else

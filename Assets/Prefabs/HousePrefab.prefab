@@ -10,8 +10,9 @@ GameObject:
   m_Component:
   - component: {fileID: 5697702937790108480}
   - component: {fileID: 999680349187888116}
+  - component: {fileID: 2139872179808219048}
   m_Layer: 7
-  m_Name: 'HousePrefab  '
+  m_Name: HousePrefab
   m_TagString: TinyHouse
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -54,6 +55,26 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 6.95, y: 6.46, z: 7.15}
   m_Center: {x: 0.21, y: 3.1, z: -0.96}
+--- !u!114 &2139872179808219048
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2833249011128094447}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be44a17d9b901de48882f21f7b2e9386, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colorVariants:
+  - variantName: Default
+    color: {r: 1, g: 1, b: 1, a: 0}
+  - variantName: BLUE
+    color: {r: 0, g: 0.7565923, b: 1, a: 0}
+  - variantName: RED
+    color: {r: 1, g: 0, b: 0, a: 0}
+  currentVariantIndex: 3
 --- !u!1 &8075313585039117616
 GameObject:
   m_ObjectHideFlags: 0
@@ -65,6 +86,7 @@ GameObject:
   - component: {fileID: 7754813765226154984}
   - component: {fileID: 2684559817420188795}
   - component: {fileID: 2994408189454817968}
+  - component: {fileID: 5531593768838199440}
   m_Layer: 7
   m_Name: House_01
   m_TagString: TinyHouse
@@ -140,3 +162,23 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &5531593768838199440
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8075313585039117616}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be44a17d9b901de48882f21f7b2e9386, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colorVariants:
+  - variantName: Default
+    color: {r: 1, g: 1, b: 1, a: 0}
+  - variantName: BLUE
+    color: {r: 0, g: 0.7565923, b: 1, a: 0}
+  - variantName: RED
+    color: {r: 1, g: 0, b: 0, a: 0}
+  currentVariantIndex: 3
