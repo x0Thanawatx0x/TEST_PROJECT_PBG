@@ -1,6 +1,6 @@
-﻿// ==============================
-// PlacementSystem.cs  (FIXED)
-// ==============================
+﻿// =================================================================================
+// 👑 [FULLY FIXED & SYNCED] PlacementSystem.cs (ยุบรวมโหมดภูเขาอิสระเสร็จสมบูรณ์)
+// =================================================================================
 
 using UnityEngine;
 
@@ -38,7 +38,7 @@ public class PlacementSystem : MonoBehaviour
         {
             if (editHandler) editHandler.StopEditing();
             if (splineHandler) splineHandler.ResetSplines();
-            if (terrainHandler) terrainHandler.SetBrushMode(0);
+            if (terrainHandler) terrainHandler.SetBrushMode(0); // กลับสู่โหมดคลีน None
         }
 
         // ---- ถ้ากำลัง edit อยู่ → ส่งทุก input ให้ editHandler ----
@@ -59,7 +59,6 @@ public class PlacementSystem : MonoBehaviour
 
     private void HandleSelection()
     {
-        // FIX: early return ถ้าไม่ได้กดคลิก
         if (!Input.GetMouseButtonDown(0))
             return;
 
@@ -106,57 +105,51 @@ public class PlacementSystem : MonoBehaviour
         switch (toolManager.currentTool)
         {
             case ToolManager.BuildTool.House:
-                terrainHandler.SetBrushMode(0);
-                objectHandler.HandleHousePlacement(
-                    mainCam,
-                    toolManager.houseIndex);
+                terrainHandler.SetBrushMode(0); // None
+                objectHandler.HandleHousePlacement(mainCam, toolManager.houseIndex);
                 break;
 
             case ToolManager.BuildTool.Furniture:
-                terrainHandler.SetBrushMode(0);
-                objectHandler.HandleMultiPlacement(
-                    mainCam,
-                    toolManager.furnitureIndex);
+                terrainHandler.SetBrushMode(0); // None
+                objectHandler.HandleMultiPlacement(mainCam, toolManager.furnitureIndex);
                 break;
 
             case ToolManager.BuildTool.Nature:
-                terrainHandler.SetBrushMode(0);
-                objectHandler.HandleNatureSpline(
-                    mainCam,
-                    toolManager.natureIndex);
+                terrainHandler.SetBrushMode(0); // None
+                objectHandler.HandleNatureSpline(mainCam, toolManager.natureIndex);
                 break;
 
             case ToolManager.BuildTool.Wall:
-                terrainHandler.SetBrushMode(0);
+                terrainHandler.SetBrushMode(0); // None
                 splineHandler.HandleWallSpline(mainCam);
                 break;
 
             case ToolManager.BuildTool.Road:
-                terrainHandler.SetBrushMode(1);
-                terrainHandler.HandleTerrainEditor(
-                    mainCam, editHandler);
+                terrainHandler.SetBrushMode(1); // PaintRoad
+                terrainHandler.HandleTerrainEditor(mainCam, editHandler);
                 break;
 
             case ToolManager.BuildTool.Pond:
-                terrainHandler.SetBrushMode(2);
-                terrainHandler.HandleTerrainEditor(
-                    mainCam, editHandler);
+                terrainHandler.SetBrushMode(2); // DigPond
+                terrainHandler.HandleTerrainEditor(mainCam, editHandler);
                 break;
 
             case ToolManager.BuildTool.Eraser:
-                terrainHandler.SetBrushMode(3);
-                terrainHandler.HandleTerrainEditor(
-                    mainCam, editHandler);
+                terrainHandler.SetBrushMode(3); // Eraser
+                terrainHandler.HandleTerrainEditor(mainCam, editHandler);
                 break;
 
+            // =================================================================================
+            // ⛰️ [UPGRADED MOUNTAIN TOOL] ย้ายระบบฟรีฟอร์ม (เลข 9 เดิม) ขึ้นมาแทนที่โหมดภูเขาถาวร!
+            // =================================================================================
             case ToolManager.BuildTool.Mountain:
+                // สั่งเปลี่ยน Enum แปรงที่สคริปต์ดินให้รันดักจับ "EditFreeform" (หมุดสลักดึงสเกลเหลืองทอง) แทนตัวเก่าทันที!
                 terrainHandler.SetBrushMode(4);
-                terrainHandler.HandleTerrainEditor(
-                    mainCam, editHandler);
+                terrainHandler.HandleTerrainEditor(mainCam, editHandler);
                 break;
 
             case ToolManager.BuildTool.None:
-                terrainHandler.SetBrushMode(0);
+                terrainHandler.SetBrushMode(0); // None
                 break;
         }
     }

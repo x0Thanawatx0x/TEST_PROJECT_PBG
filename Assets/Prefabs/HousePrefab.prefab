@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5697702937790108480}
   - component: {fileID: 999680349187888116}
-  - component: {fileID: 2139872179808219048}
+  - component: {fileID: 8191746366246526800}
   m_Layer: 7
   m_Name: HousePrefab
   m_TagString: TinyHouse
@@ -55,25 +55,35 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 6.95, y: 6.46, z: 7.15}
   m_Center: {x: 0.21, y: 3.1, z: -0.96}
---- !u!114 &2139872179808219048
+--- !u!114 &8191746366246526800
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2833249011128094447}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: be44a17d9b901de48882f21f7b2e9386, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   colorVariants:
   - variantName: Default
-    color: {r: 1, g: 1, b: 1, a: 0}
-  - variantName: BLUE
-    color: {r: 0, g: 0.7565923, b: 1, a: 0}
-  - variantName: RED
-    color: {r: 1, g: 0, b: 0, a: 0}
+    uiColor: {r: 1, g: 1, b: 1, a: 1}
+    materials:
+    - {fileID: 2100000, guid: a766724e0fde8fa45914171f843d61ed, type: 2}
+  - variantName: Blue
+    uiColor: {r: 0.33018857, g: 0.8425722, b: 1, a: 1}
+    materials:
+    - {fileID: 2100000, guid: 45b35d8d0e8fafc4f956e184fd420197, type: 2}
+  - variantName: Red
+    uiColor: {r: 1, g: 0, b: 0, a: 1}
+    materials:
+    - {fileID: 2100000, guid: 5d29f50a382a5aa4895cdf493c90e7f6, type: 2}
+  - variantName: White
+    uiColor: {r: 1, g: 1, b: 1, a: 1}
+    materials:
+    - {fileID: 2100000, guid: 26f418bfd6ea2fc44ad31b875bdff1d9, type: 2}
   currentVariantIndex: 3
 --- !u!1 &8075313585039117616
 GameObject:
@@ -169,16 +179,26 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8075313585039117616}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: be44a17d9b901de48882f21f7b2e9386, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   colorVariants:
   - variantName: Default
-    color: {r: 1, g: 1, b: 1, a: 0}
-  - variantName: BLUE
-    color: {r: 0, g: 0.7565923, b: 1, a: 0}
-  - variantName: RED
-    color: {r: 1, g: 0, b: 0, a: 0}
+    uiColor: {r: 1, g: 1, b: 1, a: 1}
+    materials:
+    - {fileID: 2100000, guid: a766724e0fde8fa45914171f843d61ed, type: 2}
+  - variantName: Blue
+    uiColor: {r: 0.33018857, g: 0.8425722, b: 1, a: 1}
+    materials:
+    - {fileID: 2100000, guid: 45b35d8d0e8fafc4f956e184fd420197, type: 2}
+  - variantName: Red
+    uiColor: {r: 1, g: 0, b: 0, a: 1}
+    materials:
+    - {fileID: 2100000, guid: 5d29f50a382a5aa4895cdf493c90e7f6, type: 2}
+  - variantName: White
+    uiColor: {r: 1, g: 1, b: 1, a: 1}
+    materials:
+    - {fileID: 2100000, guid: 26f418bfd6ea2fc44ad31b875bdff1d9, type: 2}
   currentVariantIndex: 3

@@ -1,9 +1,6 @@
 ﻿// ==============================
 // ColorPickerUI.cs
 // ==============================
-// ใส่ไว้บน GameObject เดียวกับ Panel UI
-// เรียก ShowFor() จาก EditTransformHandler
-// หรือจาก PlacementSystem ตอน StartEditing
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,13 +9,8 @@ using System.Collections.Generic;
 public class ColorPickerUI : MonoBehaviour
 {
     [Header("References")]
-    // panel ที่ซ่อน/แสดง
     [SerializeField] private GameObject panel;
-
-    // prefab ของปุ่มสีแต่ละอัน
     [SerializeField] private GameObject colorButtonPrefab;
-
-    // container สำหรับวาง button
     [SerializeField] private Transform buttonContainer;
 
     private ObjectColorHandler currentTarget;
@@ -31,9 +23,6 @@ public class ColorPickerUI : MonoBehaviour
         Hide();
     }
 
-    // -------------------------------------------------------
-    // ShowFor — เรียกตอน select TinyHouse
-    // -------------------------------------------------------
     public void ShowFor(GameObject obj)
     {
         if (obj == null)
@@ -47,7 +36,6 @@ public class ColorPickerUI : MonoBehaviour
 
         if (handler == null)
         {
-            // object นี้ไม่มี color handler → ซ่อน UI
             Hide();
             return;
         }
@@ -68,12 +56,8 @@ public class ColorPickerUI : MonoBehaviour
             panel.SetActive(false);
     }
 
-    // -------------------------------------------------------
-    // สร้างปุ่มตาม variant ที่มี
-    // -------------------------------------------------------
     private void BuildButtons()
     {
-        // ลบปุ่มเก่าทิ้ง
         foreach (GameObject btn in spawnedButtons)
         {
             if (btn != null)
@@ -90,37 +74,37 @@ public class ColorPickerUI : MonoBehaviour
         List<ObjectColorHandler.ColorVariant> variants =
             currentTarget.GetAllVariants();
 
+        if (variants == null || variants.Count == 0)
+            return;
+
         for (int i = 0; i < variants.Count; i++)
         {
-            int index = i; // capture ลง closure
+            int index = i;
 
             GameObject btnObj =
                 Instantiate(
                     colorButtonPrefab,
                     buttonContainer);
 
-            // ตั้งสีของปุ่มให้ตรงกับ variant
+            // ใช้ uiColor สำหรับสีปุ่ม
             Image img =
                 btnObj.GetComponent<Image>();
 
             if (img != null)
-                img.color = variants[i].color;
+                img.color = variants[i].uiColor;
 
-            // ผูก onClick
             Button btn =
                 btnObj.GetComponent<Button>();
 
             if (btn != null)
             {
+                btn.onClick.RemoveAllListeners();
+
                 btn.onClick.AddListener(() =>
                 {
                     OnColorButtonClicked(index);
                 });
             }
-
-            // tooltip ชื่อ variant (optional)
-            // Text label = btnObj.GetComponentInChildren<Text>();
-            // if (label) label.text = variants[i].variantName;
 
             spawnedButtons.Add(btnObj);
         }
@@ -132,9 +116,5 @@ public class ColorPickerUI : MonoBehaviour
             return;
 
         currentTarget.ApplyColor(index);
-
-        Debug.Log(
-            "[COLOR UI] Applied variant " +
-            index);
     }
 }

@@ -4,7 +4,6 @@ using Unity.Cinemachine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.Localization.Components;
-using UnityEngine.Localization.Settings;
 
 public class ViewManager : MonoBehaviour
 {
@@ -35,7 +34,7 @@ public class ViewManager : MonoBehaviour
     [Header("Dependencies to Reset")]
     [SerializeField] private ToolManager toolManager;
     [SerializeField] private PlacementSystem placementSystem;
-    [SerializeField] private PhotoModeManager photoMode; // ✅ เชื่อมต่อเพื่อเช็คว่ากำลังถ่ายรูปอยู่ไหม
+    [SerializeField] private PhotoModeManager photoMode;
 
     [Header("UI Text (Editable)")]
     public string builderText = "โหมด: Builder 🏠";
@@ -47,10 +46,13 @@ public class ViewManager : MonoBehaviour
     [Header("Transition")]
     public float transitionTime = 0.8f;
 
-    bool isSwitching = false;
+    private bool isSwitching = false;
 
     void Start()
     {
+        // ✨ บังคับระบบเวลาของโลกให้ทำงานปกติ ป้องกันบั๊กแช่แข็งแอนิเมชันกล้องค้าง
+        Time.timeScale = 1f;
+
         SetMode(GameMode.Builder);
 
         if (switchButton != null)
@@ -59,20 +61,16 @@ public class ViewManager : MonoBehaviour
 
     void Update()
     {
-        // ✅ กฎเหล็ก: ถ้าอยู่ใน Photo Mode จะกด V สลับโหมดไม่ได้ (เพื่อป้องกัน UI ทับซ้อน)
-        // แต่ยังสามารถขยับตัว/ขยับกล้องในโหมดนั้นๆ เพื่อถ่ายรูปได้ปกติ
         if (photoMode != null && photoMode.isPhotoMode)
         {
-            return; // หยุดการเช็คปุ่ม V และ L ในเฟรมนี้
+            return;
         }
 
-        // ⌨️ กด V เพื่อสลับโหมด (ทำงานเฉพาะตอนไม่ได้เปิดโหมดถ่ายรูป)
         if (Input.GetKeyDown(KeyCode.V) && !isSwitching)
         {
             ToggleMode();
         }
 
-        // ⌨️ กด L เพื่อสลับภาษา
         if (Input.GetKeyDown(KeyCode.L))
         {
             LocaleSelector selector = Object.FindFirstObjectByType<LocaleSelector>();
@@ -84,7 +82,6 @@ public class ViewManager : MonoBehaviour
             }
         }
 
-        // 🖱️ พิเศษ: ในโหมด Viewer ถ้ากด Ctrl ค้างไว้ ให้โชว์เมาส์
         if (currentMode == GameMode.Viewer && !isSwitching)
         {
             if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
@@ -102,7 +99,6 @@ public class ViewManager : MonoBehaviour
 
     public void ToggleMode()
     {
-        // ✅ ป้องกันการกดผ่านปุ่ม UI บนหน้าจอขณะถ่ายรูปด้วย
         if (photoMode != null && photoMode.isPhotoMode) return;
 
         if (!isSwitching)
@@ -113,6 +109,7 @@ public class ViewManager : MonoBehaviour
     {
         isSwitching = true;
 
+        // ปิดคอนโทรลเลอร์ชั่วคราวระหว่างกล้องกำลังสไลด์นุ่มๆ ข้ามโหมด
         if (builderController != null) builderController.enabled = false;
         if (viewerController != null) viewerController.enabled = false;
 
@@ -171,7 +168,7 @@ public class ViewManager : MonoBehaviour
         {
             time += Time.deltaTime;
             float t = time / transitionTime;
-            t = t * t * (3f - 2f * t);
+            t = t * t * (3f - 2f * t); // Smoothstep
             from.position = Vector3.Lerp(startPos, targetPos, t);
             from.rotation = Quaternion.Slerp(startRot, targetRot, t);
             yield return null;
@@ -193,7 +190,12 @@ public class ViewManager : MonoBehaviour
             if (builderCam != null)
                 builderCam.Priority = 10;
 
-            if (builderController != null) builderController.enabled = true;
+            // ✨ [FIXED SAFETY] ปลดล็อกสคริปต์กล้องให้กลับมาทำงาน ห้ามค้างคาเฟรมเด็ดขาด
+            if (builderController != null)
+            {
+                builderController.enabled = true;
+                builderController.gameObject.SetActive(true);
+            }
             if (viewerController != null) viewerController.enabled = false;
 
             Cursor.lockState = CursorLockMode.None;
@@ -222,7 +224,13 @@ public class ViewManager : MonoBehaviour
                 builderCam.Priority = 0;
 
             if (builderController != null) builderController.enabled = false;
-            if (viewerController != null) viewerController.enabled = true;
+
+            // ✨ [FIXED SAFETY] เปิดระบบขยับกล้องฝั่ง Viewer ให้ตื่นขึ้นมาทำงานทันที
+            if (viewerController != null)
+            {
+                viewerController.enabled = true;
+                viewerController.gameObject.SetActive(true);
+            }
 
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
@@ -241,5 +249,7 @@ public class ViewManager : MonoBehaviour
                 modeTextLocalizer.StringReference.TableEntryReference = "MODE_VIEWER";
             }
         }
+
+        Debug.Log($"<color=lime>[ViewManager]</color> สลับสถานะสำเร็จ! โหมดปัจจุบันคือ: {currentMode}");
     }
 }

@@ -52,17 +52,34 @@ public class CameraController : MonoBehaviour
 
     void HandleRotation()
     {
+        // 🎯 [ADDED] จังหวะเฟรมแรกสุดที่กดคลิกขวาลงไปดื้อๆ ให้ปล่อยโฟกัสวัตถุชั่วคราวเพื่อความปลอดภัย
+        if (Input.GetMouseButtonDown(1))
+        {
+            Ray rayCheck = Camera.main.ScreenPointToRay(Input.mousePosition);
+            Physics.Raycast(rayCheck, out RaycastHit hit, Mathf.Infinity);
+        }
+
+        // 🎯 เมื่อผู้เล่นกด "คลิกขวาค้างไว้" (ต้องการหมุนมุมกล้อง)
         if (Input.GetMouseButton(1))
         {
+            // ✨ [ADDED SAFETY FIX] บังคับล็อกเมาส์ไว้กลางจอชั่วคราว เพื่อดึงค่าอินพุตให้ไม่เป็น 0 ทื่อๆ
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+
             float mouseX = Input.GetAxis("Mouse X") * sensitivity;
             float mouseY = Input.GetAxis("Mouse Y") * sensitivity;
 
             rotationX += mouseX;
             rotationY -= mouseY;
-
             rotationY = Mathf.Clamp(rotationY, minViewAngle, maxViewAngle);
 
             transform.rotation = Quaternion.Euler(rotationY, rotationX, 0);
+        }
+        // 🎯 [ADDED] เมื่อผู้เล่น "ปล่อยนิ้ว" จากคลิกขวา ให้คืนเมาส์กลับมาลอยอิสระทันที
+        else if (Input.GetMouseButtonUp(1))
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
     }
 
@@ -73,22 +90,18 @@ public class CameraController : MonoBehaviour
 
         Vector3 direction = transform.forward;
         float moveAmount = scroll * zoomSpeed;
-
         Vector3 targetPosition = transform.position + direction * moveAmount;
 
-        // =========================
-        // 🌿 TINY GLADE STYLE COLLISION
-        // =========================
-
+        // =================================================
+        // 🌿 TINY GLADE STYLE COLLISION (ลอจิกดั้งเดิมของปิ๊บ)
+        // =================================================
         Ray ray = new Ray(transform.position, direction);
         RaycastHit hit;
-
         float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
 
         if (Physics.Raycast(ray, out hit, distanceToTarget))
         {
             float safeDistance = hit.distance - 0.3f;
-
             if (safeDistance < 0f)
                 safeDistance = 0f;
 
@@ -97,11 +110,10 @@ public class CameraController : MonoBehaviour
 
         transform.position = targetPosition;
 
-        // =========================
-        // HEIGHT CLAMP (กันหลุดโลก)
-        // =========================
+        // =================================================
+        // HEIGHT CLAMP (กันหลุดโลก - ลоจิกดั้งเดิมของปิ๊บ)
+        // =================================================
         float clampedY = Mathf.Clamp(transform.position.y, minZoomDistance, maxZoomDistance);
-
         transform.position = new Vector3(
             transform.position.x,
             clampedY,

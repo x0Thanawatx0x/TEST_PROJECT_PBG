@@ -1,47 +1,55 @@
 ﻿using UnityEngine;
+using System.Collections.Generic;
 
 public class TerrainModifierHandler : MonoBehaviour
 {
-    // เพิ่ม RaiseMountain เข้ามาในระบบโครงสร้างประเภทแปรง
-    public enum BrushMode { None, PaintRoad, DigPond, Eraser, RaiseMountain }
+    public enum BrushMode { None, PaintRoad, DigPond, Eraser, EditFreeform }
+    [Header("🎮 Current Tool Active")]
     public BrushMode currentMode = BrushMode.None;
 
     [Header("Terrain Settings")]
     [SerializeField] private Terrain terrain;
-    [SerializeField] private float brushSize = 2f;
-    [SerializeField] private float minSize = 1f;
-    [SerializeField] private float maxSize = 20f;
-    [SerializeField] private float sizeStep = 1f;
+    public float brushSize = 2f;
+    public float minSize = 1f;
+    public float maxSize = 20f;
+    public float sizeStep = 1f;
 
     [Space(5)]
-    [Header("⛰️ Mountain Brush Settings (แยกเฉพาะของภูเขา)")]
-    [SerializeField] private float mountainBrushSize = 8f; // ขนาดแปรงภูเขาปัจจุบัน (User กด +/- เพื่อปรับ กว้าง/แคบ ได้)
-    [SerializeField] private float mountainBrushMaxSize = 40f; // ล็อกขนาดใหญ่สุดของแปรงภูเขา
+    [Header("⛰️ Mountain Brush Settings (รัศมีฐานเขาเลข 8)")]
+    public float mountainBrushSize = 5f;
+    public float mountainBrushMaxSize = 8f;
 
     [Space(5)]
-    [Header("📐 Mountain Shape Settings (สไตล์ Blocky ขอบคมด้านชัน)")]
-    [SerializeField] private float firstClickHeightsOffset = 5f; // ระยะความสูงที่เด้งขึ้นมาจากพื้นเดิมทันที
-    [SerializeField] private float maxMountainHeightOffset = 50f; // เพดานความสูงสูงสุด
+    [Header("📐 Mountain Shape Settings")]
+    public float firstClickHeightsOffset = 5f;
+    public float maxMountainHeightOffset = 20f;
+
+    [Space(5)]
+    [Header("🍃 Tiny Glade Style Settings")]
+    public int cliffLayerIndex = 2;
+    [Range(10f, 60f)] public float cliffSlopeThreshold = 30f;
 
     [Space(5)]
     [SerializeField] private int roadLayerIndex = 1;
     [SerializeField] private int grassLayerIndex = 0;
 
     [Header("Performance Settings")]
-    [SerializeField] private float modifyRate = 0.05f; // ความถี่ในการวาด (วินาที) ยิ่งน้อยยิ่งถี่
-    [SerializeField] private float mountainRaiseSpeed = 5f; // ความเร็วในการดึงดินปัจจุบัน (User กด [ / ] เพื่อปรับ สูงไว/สูงช้า ได้)
-    [SerializeField] private float speedStep = 1f; // สเต็ปการเพิ่มลดความเร็วความสูงในการกดแต่ละครั้ง
-    [SerializeField] private float minRaiseSpeed = 1f; // ความเร็วขั้นต่ำ
-    [SerializeField] private float maxRaiseSpeed = 20f; // ความเร็วขั้นสูงสุด
+    public float modifyRate = 0.1f;
+    public float mountainRaiseSpeed = 0.0005f;
+    public float speedStep = 1f;
+    public float minRaiseSpeed = 1f;
+    public float maxRaiseSpeed = 20f;
     private float nextModifyTime = 0f;
 
     [Header("2D Sprite Visualizer (Prefab)")]
-    [SerializeField] private GameObject brushVisualizerPrefab;
-    [SerializeField] private float heightOffset = 0.2f;
+    public GameObject brushVisualizerPrefab;
+    public float heightOffset = 0.5f;
 
-    [Header("✨ Game View GL Line Settings")]
-    [SerializeField] private Material lineMaterial;
-    [SerializeField] private Color gameViewCircleColor = new Color(1f, 0f, 0f, 0.9f);
+    [Header("🧱 Mountain Anchor Spawner")]
+    public GameObject mountainAnchorPrefab;
+
+    private List<MountainEditableAnchor> activeAnchorsInScene = new List<MountainEditableAnchor>();
+    public MountainEditableAnchor currentlySelectedMountain = null;
 
     private PlacementSystem system;
     private float[,] originalHeights;
@@ -49,8 +57,6 @@ public class TerrainModifierHandler : MonoBehaviour
 
     private bool isFirstClick = false;
     private float baseTerrainHeightAtClick = 0f;
-    private Vector3 currentMouseHitPoint;
-    private Camera cachedCam;
 
     public void Initialize(PlacementSystem sys)
     {
@@ -65,102 +71,91 @@ public class TerrainModifierHandler : MonoBehaviour
             visualizerInstance = Instantiate(brushVisualizerPrefab);
             visualizerInstance.SetActive(false);
         }
-
-        if (lineMaterial == null)
-        {
-            Shader shader = Shader.Find("Hidden/Internal-Colored");
-            if (shader != null) lineMaterial = new Material(shader);
-        }
     }
 
     public void SetBrushMode(int modeIndex)
     {
         currentMode = (BrushMode)modeIndex;
+        Debug.Log($"<color=lime>[TerrainHandler]</color> สลับแปรงเป็นโหมด: <b>{currentMode}</b>");
         if (currentMode == BrushMode.None && visualizerInstance != null)
             visualizerInstance.SetActive(false);
     }
 
-    public void SetMountainShapeByTool(ToolManager.BuildTool currentTool)
-    {
-        if (currentTool == ToolManager.BuildTool.House)
-        {
-            mountainBrushSize = 12f;
-        }
-        else if (currentTool == ToolManager.BuildTool.Furniture)
-        {
-            mountainBrushSize = 5f;
-        }
-        else
-        {
-            mountainBrushSize = 8f;
-        }
-    }
-
     public void HandleTerrainEditor(Camera cam, EditTransformHandler editHandler)
     {
-        cachedCam = cam;
-
-        // ปุ่มลัดพิเศษ: กดเลข 8 บนแป้นพิมพ์เพื่อเข้าสู่โหมดทำภูเขาทันที
-        if (Input.GetKeyDown(KeyCode.Alpha8) || Input.GetKeyDown(KeyCode.Keypad8))
+        // 🛠️ ปุ่ม ESC สั่งซ่อนกิซโมให้เล่นอนิเมชั่นหด Scale ลงดินนุ่มนวล พร้อมปิดโหมดแปรงทันที
+        if (Input.GetKeyDown(KeyCode.Escape))
         {
-            SetBrushMode((int)BrushMode.RaiseMountain);
+            DeselectCurrentMountain();
+            SetBrushMode((int)BrushMode.None);
+            Debug.Log("<color=red><b>[ESC Pressed]</b></color> สั่งซ่อนกิซโมแบบนุ่มนวลเรียบร้อยแล้วนะปิ๊บ!");
+            return;
         }
+
+        if (Input.GetKeyDown(KeyCode.Alpha8) || Input.GetKeyDown(KeyCode.Keypad8)) SetBrushMode((int)BrushMode.EditFreeform);
 
         if (currentMode == BrushMode.None)
         {
             if (visualizerInstance != null) visualizerInstance.SetActive(false);
+
+            if (Input.GetMouseButtonDown(0) && currentlySelectedMountain != null)
+            {
+                DeselectCurrentMountain();
+            }
             return;
         }
 
-        // 1. ระบบปรับขนาดแปรงอินเกม (User กดเพื่อปรับ กว้างขึ้น / แคบลง)
         if (Input.GetKeyDown(KeyCode.Equals) || Input.GetKeyDown(KeyCode.KeypadPlus))
         {
-            if (currentMode == BrushMode.RaiseMountain)
+            if (currentMode == BrushMode.EditFreeform)
                 mountainBrushSize = Mathf.Clamp(mountainBrushSize + sizeStep, minSize, mountainBrushMaxSize);
             else
                 brushSize = Mathf.Clamp(brushSize + sizeStep, minSize, maxSize);
         }
-
         if (Input.GetKeyDown(KeyCode.Minus) || Input.GetKeyDown(KeyCode.KeypadMinus))
         {
-            if (currentMode == BrushMode.RaiseMountain)
+            if (currentMode == BrushMode.EditFreeform)
                 mountainBrushSize = Mathf.Clamp(mountainBrushSize - sizeStep, minSize, mountainBrushMaxSize);
             else
                 brushSize = Mathf.Clamp(brushSize - sizeStep, minSize, maxSize);
-        }
-
-        // 2. ระบบปรับความเร็ว/ความชันอินเกม 
-        if (currentMode == BrushMode.RaiseMountain)
-        {
-            // ✅ แก้ไข: เปลี่ยนจาก CloseBracket เป็น RightBracket
-            if (Input.GetKeyDown(KeyCode.RightBracket))
-            {
-                mountainRaiseSpeed = Mathf.Clamp(mountainRaiseSpeed + speedStep, minRaiseSpeed, maxRaiseSpeed);
-            }
-            // ✅ แก้ไข: เปลี่ยนจาก OpenBracket เป็น LeftBracket
-            if (Input.GetKeyDown(KeyCode.LeftBracket))
-            {
-                mountainRaiseSpeed = Mathf.Clamp(mountainRaiseSpeed - speedStep, minRaiseSpeed, maxRaiseSpeed);
-            }
         }
 
         Ray ray = cam.ScreenPointToRay(Input.mousePosition);
 
         if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, system.groundLayer))
         {
-            currentMouseHitPoint = hit.point;
             UpdateVisualizer(hit);
 
-            if (Input.GetMouseButtonDown(0) && currentMode == BrushMode.RaiseMountain)
+            if (Input.GetMouseButtonDown(0))
             {
-                isFirstClick = true;
-                if (terrain)
+                MountainEditableAnchor clickedMountain = FindMountainAtPosition(hit.point);
+
+                if (clickedMountain != null)
                 {
-                    baseTerrainHeightAtClick = terrain.SampleHeight(hit.point);
+                    DeselectCurrentMountain();
+                    currentlySelectedMountain = clickedMountain;
+                    currentlySelectedMountain.SelectMountain(true);
+                    if (visualizerInstance != null) visualizerInstance.SetActive(false);
+                    return;
                 }
+
+                if (currentlySelectedMountain != null)
+                {
+                    DeselectCurrentMountain();
+                    return;
+                }
+
+                if (currentMode == BrushMode.EditFreeform && mountainAnchorPrefab != null)
+                {
+                    SpawnMountainAnchorAtPosition(hit.point);
+                    return;
+                }
+
+                isFirstClick = true;
+                if (terrain) baseTerrainHeightAtClick = terrain.SampleHeight(hit.point);
             }
 
-            if (Input.GetMouseButton(0) && Time.time >= nextModifyTime)
+            if (Input.GetMouseButton(0) && Time.time >= nextModifyTime && currentlySelectedMountain == null)
             {
                 ExecuteAction(hit.point, editHandler);
                 nextModifyTime = Time.time + modifyRate;
@@ -172,16 +167,62 @@ public class TerrainModifierHandler : MonoBehaviour
         }
     }
 
+    private MountainEditableAnchor FindMountainAtPosition(Vector3 worldPos)
+    {
+        activeAnchorsInScene.RemoveAll(item => item == null);
+        foreach (var anchor in activeAnchorsInScene)
+        {
+            float distXZ = Vector2.Distance(new Vector2(worldPos.x, worldPos.z), new Vector2(anchor.transform.position.x, anchor.transform.position.z));
+            if (distXZ <= anchor.GetCurrentSize()) return anchor;
+        }
+        return null;
+    }
+
+    public void DeselectCurrentMountain()
+    {
+        if (currentlySelectedMountain != null)
+        {
+            // 🟢 ปลดสถานะเลือก เพื่อเปิดทางให้ลูกบอลวิ่งอนิเมชั่น Lerp หดขนาดสเกลลงดินแบบ Cozy สวยงามร้อยเปอร์เซ็นต์!
+            currentlySelectedMountain.SelectMountain(false);
+            currentlySelectedMountain = null;
+        }
+
+        if (visualizerInstance != null)
+        {
+            visualizerInstance.SetActive(false);
+        }
+    }
+
+    private void SpawnMountainAnchorAtPosition(Vector3 worldPos)
+    {
+        Vector3 spawnPos = worldPos;
+        if (terrain != null) spawnPos.y = terrain.SampleHeight(worldPos) + terrain.transform.position.y;
+
+        GameObject anchorGo = Instantiate(mountainAnchorPrefab, spawnPos, Quaternion.identity);
+        MountainEditableAnchor anchorScript = anchorGo.GetComponent<MountainEditableAnchor>();
+        if (anchorScript != null)
+        {
+            anchorScript.SetupAnchor(this, mountainBrushSize, mountainRaiseSpeed);
+            activeAnchorsInScene.Add(anchorScript);
+            currentlySelectedMountain = anchorScript;
+        }
+    }
+
     private void UpdateVisualizer(RaycastHit hit)
     {
         if (visualizerInstance != null)
         {
-            if (!visualizerInstance.activeSelf) visualizerInstance.SetActive(true);
+            if (currentlySelectedMountain != null)
+            {
+                visualizerInstance.SetActive(false);
+                return;
+            }
 
+            if (!visualizerInstance.activeSelf) visualizerInstance.SetActive(true);
             visualizerInstance.transform.position = hit.point + (Vector3.up * heightOffset);
             visualizerInstance.transform.rotation = Quaternion.LookRotation(-hit.normal);
 
-            float activeSize = (currentMode == BrushMode.RaiseMountain) ? mountainBrushSize : brushSize;
+            float activeSize = (currentMode == BrushMode.EditFreeform) ? mountainBrushSize : brushSize;
             float visualScale = activeSize * 2f;
             visualizerInstance.transform.localScale = new Vector3(visualScale, visualScale, 1f);
         }
@@ -189,310 +230,212 @@ public class TerrainModifierHandler : MonoBehaviour
 
     private void ExecuteAction(Vector3 point, EditTransformHandler editHandler)
     {
+        float calculatedAmt = isFirstClick ? firstClickHeightsOffset : (mountainRaiseSpeed * modifyRate);
         switch (currentMode)
         {
             case BrushMode.PaintRoad: PaintTerrain(point, roadLayerIndex); break;
             case BrushMode.DigPond: ModifyHeight(point, -0.01f); break;
             case BrushMode.Eraser: PerformEraser(point, editHandler); break;
-
-            case BrushMode.RaiseMountain:
-                float calculatedAmt = isFirstClick ? firstClickHeightsOffset : (mountainRaiseSpeed * modifyRate);
-                ModifyHeightBlockyStyle(point, calculatedAmt);
+            case BrushMode.EditFreeform:
+                ModifyHeightFreeformStyle(point, calculatedAmt);
                 isFirstClick = false;
                 break;
         }
     }
 
+    private void ModifyHeightFreeformStyle(Vector3 worldPos, float amt)
+    {
+        if (!terrain) return;
+        TerrainData td = terrain.terrainData;
+        int res = td.heightmapResolution;
+        float normalizedAmt = amt / td.size.y;
+        float normalizedMaxHeight = (baseTerrainHeightAtClick + maxMountainHeightOffset) / td.size.y;
+
+        int centerX = Mathf.RoundToInt(((worldPos.x - terrain.transform.position.x) / td.size.x) * (res - 1));
+        int centerZ = Mathf.RoundToInt(((worldPos.z - terrain.transform.position.z) / td.size.z) * (res - 1));
+        float radiusInPixels = (mountainBrushSize / td.size.x) * (res - 1);
+        int r = Mathf.RoundToInt(radiusInPixels);
+
+        int startX = Mathf.Clamp(centerX - r, 0, res - 1);
+        int startZ = Mathf.Clamp(centerZ - r, 0, res - 1);
+        int endX = Mathf.Clamp(centerX + r, 0, res - 1);
+        int endZ = Mathf.Clamp(centerZ + r, 0, res - 1);
+
+        int width = endX - startX + 1; int height = endZ - startZ + 1;
+        if (width <= 0 || height <= 0) return;
+
+        float[,] heights = td.GetHeights(startX, startZ, width, height);
+        for (int i = 0; i < height; i++)
+        {
+            for (int j = 0; j < width; j++)
+            {
+                float distance = Vector2.Distance(new Vector2(centerX, centerZ), new Vector2(startX + j, startZ + i));
+                if (distance <= radiusInPixels)
+                {
+                    float t = distance / radiusInPixels;
+                    float falloff = 1f - (t * t * (3f - 2f * t));
+                    heights[i, j] = Mathf.Clamp(heights[i, j] + (normalizedAmt * falloff), 0f, normalizedMaxHeight);
+                }
+            }
+        }
+        td.SetHeights(startX, startZ, heights);
+        ApplyAutoCliffTexture(startX, startZ, width, height);
+    }
+
+    private void ApplyAutoCliffTexture(int startX, int startZ, int width, int height)
+    {
+        if (!terrain) return;
+        TerrainData td = terrain.terrainData;
+        int res = td.heightmapResolution;
+
+        int alphaStartX = Mathf.Clamp(Mathf.RoundToInt((float)startX / res * td.alphamapWidth), 0, td.alphamapWidth - 1);
+        int alphaGridZ = Mathf.Clamp(Mathf.RoundToInt((float)startZ / res * td.alphamapHeight), 0, td.alphamapHeight - 1);
+        int alphaWidth = Mathf.Clamp(Mathf.RoundToInt((float)width / res * td.alphamapWidth), 1, td.alphamapWidth - alphaStartX);
+        int alphaHeight = Mathf.Clamp(Mathf.RoundToInt((float)height / res * td.alphamapHeight), 1, td.alphamapHeight - alphaGridZ);
+
+        float[,,] alphas = td.GetAlphamaps(alphaStartX, alphaGridZ, alphaWidth, alphaHeight);
+        for (int i = 0; i < alphaHeight; i++)
+        {
+            for (int j = 0; j < alphaWidth; j++)
+            {
+                float slope = td.GetSteepness((float)(alphaStartX + j) / td.alphamapWidth, (float)(alphaGridZ + i) / td.alphamapHeight);
+                bool isCliff = slope >= cliffSlopeThreshold;
+                for (int k = 0; k < td.alphamapLayers; k++)
+                {
+                    alphas[i, j, k] = isCliff ? (k == cliffLayerIndex ? 1f : 0f) : (k == grassLayerIndex ? 1f : 0f);
+                }
+            }
+        }
+        td.SetAlphamaps(alphaStartX, alphaGridZ, alphas);
+    }
+
     private void PerformEraser(Vector3 point, EditTransformHandler editHandler)
     {
         Collider[] hits = Physics.OverlapSphere(point, brushSize, system.buildableLayer);
-        foreach (Collider c in hits)
-        {
-            if (editHandler != null) editHandler.StopEditing();
-            Destroy(c.gameObject);
-        }
-        FlattenTerrain(point);
-        PaintTerrain(point, grassLayerIndex);
+        foreach (Collider c in hits) { if (editHandler != null) editHandler.StopEditing(); Destroy(c.gameObject); }
+        FlattenTerrain(point); PaintTerrain(point, grassLayerIndex);
     }
 
     private void PaintTerrain(Vector3 worldPos, int layerIdx)
     {
-        if (!terrain) return;
-        TerrainData td = terrain.terrainData;
-
-        float percentX = (worldPos.x - terrain.transform.position.x) / td.size.x;
-        float percentZ = (worldPos.z - terrain.transform.position.z) / td.size.z;
-
-        int mapX = Mathf.RoundToInt(percentX * td.alphamapWidth);
-        int mapZ = Mathf.RoundToInt(percentZ * td.alphamapHeight);
-
+        if (!terrain) return; TerrainData td = terrain.terrainData;
+        int mapX = Mathf.RoundToInt(((worldPos.x - terrain.transform.position.x) / td.size.x) * td.alphamapWidth);
+        int mapZ = Mathf.RoundToInt(((worldPos.z - terrain.transform.position.z) / td.size.z) * td.alphamapHeight);
         int r = Mathf.RoundToInt(brushSize);
-        int startX = Mathf.Clamp(mapX - r, 0, td.alphamapWidth);
-        int startZ = Mathf.Clamp(mapZ - r, 0, td.alphamapHeight);
-        int endX = Mathf.Clamp(mapX + r, 0, td.alphamapWidth);
-        int endZ = Mathf.Clamp(mapZ + r, 0, td.alphamapHeight);
-
-        int width = endX - startX;
-        int height = endZ - startZ;
-
+        int startX = Mathf.Clamp(mapX - r, 0, td.alphamapWidth - 1); int startZ = Mathf.Clamp(mapZ - r, 0, td.alphamapHeight - 1);
+        int width = Mathf.Clamp(mapX + r, 0, td.alphamapWidth) - startX; int height = Mathf.Clamp(mapZ + r, 0, td.alphamapHeight) - startZ;
         if (width <= 0 || height <= 0) return;
 
         float[,,] alphas = td.GetAlphamaps(startX, startZ, width, height);
         for (int i = 0; i < height; i++)
             for (int j = 0; j < width; j++)
-                for (int k = 0; k < td.alphamapLayers; k++)
-                    alphas[i, j, k] = (k == layerIdx) ? 1f : 0f;
-
+                for (int k = 0; k < td.alphamapLayers; k++) alphas[i, j, k] = (k == layerIdx) ? 1f : 0f;
         td.SetAlphamaps(startX, startZ, alphas);
     }
 
     private void ModifyHeight(Vector3 worldPos, float amt)
     {
-        if (!terrain) return;
-        TerrainData td = terrain.terrainData;
-        int res = td.heightmapResolution;
-
-        float percentX = (worldPos.x - terrain.transform.position.x) / td.size.x;
-        float percentZ = (worldPos.z - terrain.transform.position.z) / td.size.z;
-
-        int x = Mathf.RoundToInt(percentX * (res - 1));
-        int z = Mathf.RoundToInt(percentZ * (res - 1));
-
+        if (!terrain) return; TerrainData td = terrain.terrainData; int res = td.heightmapResolution;
+        int x = Mathf.RoundToInt(((worldPos.x - terrain.transform.position.x) / td.size.x) * (res - 1));
+        int z = Mathf.RoundToInt(((worldPos.z - terrain.transform.position.z) / td.size.z) * (res - 1));
         int r = Mathf.RoundToInt(brushSize);
-        int startX = Mathf.Clamp(x - r, 0, res);
-        int startZ = Mathf.Clamp(z - r, 0, res);
-        int endX = Mathf.Clamp(x + r, 0, res);
-        int endZ = Mathf.Clamp(z + r, 0, res);
-
-        int width = endX - startX;
-        int height = endZ - startZ;
-
+        int startX = Mathf.Clamp(x - r, 0, res - 1); int startZ = Mathf.Clamp(z - r, 0, res - 1);
+        int width = Mathf.Clamp(x + r, 0, res) - startX; int height = Mathf.Clamp(z + r, 0, res) - startZ;
         if (width <= 0 || height <= 0) return;
 
         float[,] heights = td.GetHeights(startX, startZ, width, height);
         for (int i = 0; i < height; i++)
-            for (int j = 0; j < width; j++)
-                heights[i, j] = Mathf.Clamp01(heights[i, j] + amt);
-
-        td.SetHeights(startX, startZ, heights);
-    }
-
-    private void ModifyHeightBlockyStyle(Vector3 worldPos, float amt)
-    {
-        if (!terrain) return;
-        TerrainData td = terrain.terrainData;
-        int res = td.heightmapResolution;
-
-        float normalizedAmt = amt / td.size.y;
-        float normalizedMaxHeight = (baseTerrainHeightAtClick + maxMountainHeightOffset) / td.size.y;
-
-        float percentX = (worldPos.x - terrain.transform.position.x) / td.size.x;
-        float percentZ = (worldPos.z - terrain.transform.position.z) / td.size.z;
-
-        int centerX = Mathf.RoundToInt(percentX * (res - 1));
-        int centerZ = Mathf.RoundToInt(percentZ * (res - 1));
-
-        int r = Mathf.RoundToInt(mountainBrushSize);
-        int startX = Mathf.Clamp(centerX - r, 0, res);
-        int startZ = Mathf.Clamp(centerZ - r, 0, res);
-        int endX = Mathf.Clamp(centerX + r, 0, res);
-        int endZ = Mathf.Clamp(centerZ + r, 0, res);
-
-        int width = endX - startX;
-        int height = endZ - startZ;
-
-        if (width <= 0 || height <= 0) return;
-
-        float[,] heights = td.GetHeights(startX, startZ, width, height);
-
-        for (int i = 0; i < height; i++)
-        {
-            for (int j = 0; j < width; j++)
-            {
-                int currentX = startX + j;
-                int currentZ = startZ + i;
-
-                float distance = Vector2.Distance(new Vector2(centerX, centerZ), new Vector2(currentX, currentZ));
-
-                if (distance <= mountainBrushSize)
-                {
-                    float falloff = 1f;
-                    heights[i, j] = Mathf.Clamp(heights[i, j] + (normalizedAmt * falloff), 0f, normalizedMaxHeight);
-                }
-            }
-        }
-
+            for (int j = 0; j < width; j++) heights[i, j] = Mathf.Clamp01(heights[i, j] + amt);
         td.SetHeights(startX, startZ, heights);
     }
 
     private void FlattenTerrain(Vector3 worldPos)
     {
-        if (!terrain || originalHeights == null) return;
-        TerrainData td = terrain.terrainData;
-        int res = td.heightmapResolution;
-
-        float percentX = (worldPos.x - terrain.transform.position.x) / td.size.x;
-        float percentZ = (worldPos.z - terrain.transform.position.z) / td.size.z;
-
-        int x = Mathf.RoundToInt(percentX * (res - 1));
-        int z = Mathf.RoundToInt(percentZ * (res - 1));
-
+        if (!terrain || originalHeights == null) return; TerrainData td = terrain.terrainData; int res = td.heightmapResolution;
+        int x = Mathf.RoundToInt(((worldPos.x - terrain.transform.position.x) / td.size.x) * (res - 1));
+        int z = Mathf.RoundToInt(((worldPos.z - terrain.transform.position.z) / td.size.z) * (res - 1));
         int r = Mathf.RoundToInt(brushSize);
-        int startX = Mathf.Clamp(x - r, 0, res);
-        int startZ = Mathf.Clamp(z - r, 0, res);
-        int endX = Mathf.Clamp(x + r, 0, res);
-        int endZ = Mathf.Clamp(z + r, 0, res);
-
-        int width = endX - startX;
-        int height = endZ - startZ;
-
+        int startX = Mathf.Clamp(x - r, 0, res - 1); int startZ = Mathf.Clamp(z - r, 0, res - 1);
+        int width = Mathf.Clamp(x + r, 0, res) - startX; int height = Mathf.Clamp(z + r, 0, res) - startZ;
         if (width <= 0 || height <= 0) return;
 
         float[,] restoreHeights = new float[height, width];
         for (int i = 0; i < height; i++)
-            for (int j = 0; j < width; j++)
-                restoreHeights[i, j] = originalHeights[startZ + i, startX + j];
-
+            for (int j = 0; j < width; j++) restoreHeights[i, j] = originalHeights[startZ + i, startX + j];
         td.SetHeights(startX, startZ, restoreHeights);
     }
 
-#if UNITY_EDITOR
-    private void OnDrawGizmos()
-    {
-        if (currentMode != BrushMode.RaiseMountain || system == null || terrain == null) return;
-
-        Ray ray = UnityEditor.HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
-        if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, system.groundLayer))
-        {
-            Gizmos.color = gameViewCircleColor;
-            Gizmos.DrawWireSphere(hit.point, mountainBrushSize);
-        }
-    }
-#endif
-
-    private void OnRenderObject()
-    {
-        if (currentMode != BrushMode.RaiseMountain || lineMaterial == null || currentMouseHitPoint == Vector3.zero) return;
-        if (Camera.current != cachedCam) return;
-
-        lineMaterial.SetPass(0);
-        GL.Begin(GL.LINES);
-        GL.Color(gameViewCircleColor);
-
-        float radius = mountainBrushSize;
-        int segments = 40;
-
-        Vector3 previousPoint = currentMouseHitPoint + new Vector3(radius, 0.1f, 0f);
-
-        for (int i = 1; i <= segments; i++)
-        {
-            float angle = (i / (float)segments) * Mathf.PI * 2f;
-            float x = Mathf.Cos(angle) * radius;
-            float z = Mathf.Sin(angle) * radius;
-            Vector3 nextPointLocal = new Vector3(x, 0.1f, z);
-            Vector3 nextPointWorld = currentMouseHitPoint + nextPointLocal;
-
-            if (terrain)
-            {
-                previousPoint.y = terrain.SampleHeight(previousPoint) + terrain.transform.position.y + 0.1f;
-                nextPointWorld.y = terrain.SampleHeight(nextPointWorld) + terrain.transform.position.y + 0.1f;
-            }
-
-            GL.Vertex(previousPoint);
-            GL.Vertex(nextPointWorld);
-
-            previousPoint = nextPointWorld;
-        }
-
-        GL.End();
-    }
-    // 🧱 ฟังก์ชันงอกใหม่ 1: สั่งปั้นภูเขาแบบระบุพิกัดตรง ๆ (ใช้ตอนย้ายตำแหน่งชิ้นงาน)
-    public void CreateMountainAtPosition(Vector3 position, float size, float speed)
+    public void CreateMountainAtPositionDynamic(Vector3 position, float size, float speed, float heightMultiplier)
     {
         if (!terrain) return;
-
-        // จำลองสถานการณ์เสมือนคลิกเมาส์ที่จุดนั้น ๆ 
         baseTerrainHeightAtClick = terrain.SampleHeight(position);
-
-        // สั่งใช้ลอจิกทรงเหลี่ยมคม (Blocky Style) วาดลงไปที่ตำแหน่งนั้นทันที
-        float calculatedAmt = 5f; // ค่าความสูงเริ่มต้น หรือดึงจาก speed * modifyRate
-
-        // ปรับแก้ฟังก์ชัน ModifyHeightBlockyStyle ตัวเดิมของปิ๊บให้รับค่าขนาดแบบ Dynamic ได้
-        ModifyHeightBlockyStyleAt(position, calculatedAmt, size);
+        ModifyHeightFreeformStyleAtDynamic(position, speed * modifyRate * heightMultiplier, size);
     }
 
-    // 🧹 ฟังก์ชันงอกใหม่ 2: สั่งลบภูเขาเฉพาะจุดให้กลับมาแบนราบ (เมื่อภูเขาโดนย้ายหนีหรือโดนลบ)
     public void FlattenMountainAtPosition(Vector3 position, float size)
     {
         if (!terrain || originalHeights == null) return;
-        TerrainData td = terrain.terrainData;
-        int res = td.heightmapResolution;
+        TerrainData td = terrain.terrainData; int res = td.heightmapResolution;
+        int centerX = Mathf.RoundToInt(((position.x - terrain.transform.position.x) / td.size.x) * (res - 1));
+        int centerZ = Mathf.RoundToInt(((position.z - terrain.transform.position.z) / td.size.z) * (res - 1));
+        float radiusInPixels = (size / td.size.x) * (res - 1); int r = Mathf.RoundToInt(radiusInPixels);
 
-        float percentX = (position.x - terrain.transform.position.x) / td.size.x;
-        float percentZ = (position.z - terrain.transform.position.z) / td.size.z;
-
-        int centerX = Mathf.RoundToInt(percentX * (res - 1));
-        int centerZ = Mathf.RoundToInt(percentZ * (res - 1));
-
-        int r = Mathf.RoundToInt(size);
-        int startX = Mathf.Clamp(centerX - r, 0, res);
-        int startZ = Mathf.Clamp(centerZ - r, 0, res);
-        int endX = Mathf.Clamp(centerX + r, 0, res);
-        int endZ = Mathf.Clamp(centerZ + r, 0, res);
-
-        int width = endX - startX;
-        int height = endZ - startZ;
-
+        int startX = Mathf.Clamp(centerX - r, 0, res - 1); int startZ = Mathf.Clamp(centerZ - r, 0, res - 1);
+        int endX = Mathf.Clamp(centerX + r, 0, res - 1); int endZ = Mathf.Clamp(centerZ + r, 0, res - 1);
+        int width = endX - startX + 1; int height = endZ - startZ + 1;
         if (width <= 0 || height <= 0) return;
 
         float[,] restoreHeights = new float[height, width];
         for (int i = 0; i < height; i++)
-            for (int j = 0; j < width; j++)
-                restoreHeights[i, j] = originalHeights[startZ + i, startX + j];
-
+            for (int j = 0; j < width; j++) restoreHeights[i, j] = originalHeights[startZ + i, startX + j];
         td.SetHeights(startX, startZ, restoreHeights);
+
+        int alphaStartX = Mathf.Clamp(Mathf.RoundToInt((float)startX / res * td.alphamapWidth), 0, td.alphamapWidth - 1);
+        int alphaGridZ = Mathf.Clamp(Mathf.RoundToInt((float)startZ / res * td.alphamapHeight), 0, td.alphamapHeight - 1);
+        int alphaWidth = Mathf.Clamp(Mathf.RoundToInt((float)width / res * td.alphamapWidth), 1, td.alphamapWidth - alphaStartX);
+        int alphaHeight = Mathf.Clamp(Mathf.RoundToInt((float)height / res * td.alphamapHeight), 1, td.alphamapHeight - alphaGridZ);
+
+        if (alphaWidth > 0 && alphaHeight > 0)
+        {
+            float[,,] alphas = td.GetAlphamaps(alphaStartX, alphaGridZ, alphaWidth, alphaHeight);
+            for (int i = 0; i < alphaHeight; i++)
+                for (int j = 0; j < alphaWidth; j++)
+                    for (int k = 0; k < td.alphamapLayers; k++) alphas[i, j, k] = (k == grassLayerIndex) ? 1f : 0f;
+            td.SetAlphamaps(alphaStartX, alphaGridZ, alphas);
+        }
     }
 
-    // ฟังก์ชันช่วยคำนวณแบบระบุตำแหน่งและขนาดได้อิสระ
-    private void ModifyHeightBlockyStyleAt(Vector3 targetPos, float amt, float customSize)
+    private void ModifyHeightFreeformStyleAtDynamic(Vector3 targetPos, float amt, float customSize)
     {
-        TerrainData td = terrain.terrainData;
-        int res = td.heightmapResolution;
+        if (!terrain) return;
+        TerrainData td = terrain.terrainData; int res = td.heightmapResolution;
         float normalizedAmt = amt / td.size.y;
         float normalizedMaxHeight = (baseTerrainHeightAtClick + maxMountainHeightOffset) / td.size.y;
 
-        float percentX = (targetPos.x - terrain.transform.position.x) / td.size.x;
-        float percentZ = (targetPos.z - terrain.transform.position.z) / td.size.z;
+        int centerX = Mathf.RoundToInt(((targetPos.x - terrain.transform.position.x) / td.size.x) * (res - 1));
+        int centerZ = Mathf.RoundToInt(((targetPos.z - terrain.transform.position.z) / td.size.z) * (res - 1));
+        float radiusInPixels = (customSize / td.size.x) * (res - 1); int r = Mathf.RoundToInt(radiusInPixels);
 
-        int centerX = Mathf.RoundToInt(percentX * (res - 1));
-        int centerZ = Mathf.RoundToInt(percentZ * (res - 1));
-
-        int r = Mathf.RoundToInt(customSize);
-        int startX = Mathf.Clamp(centerX - r, 0, res);
-        int startZ = Mathf.Clamp(centerZ - r, 0, res);
-        int endX = Mathf.Clamp(centerX + r, 0, res);
-        int endZ = Mathf.Clamp(centerZ + r, 0, res);
-
-        int width = endX - startX;
-        int height = endZ - startZ;
-
+        int startX = Mathf.Clamp(centerX - r, 0, res - 1); int startZ = Mathf.Clamp(centerZ - r, 0, res - 1);
+        int endX = Mathf.Clamp(centerX + r, 0, res - 1); int endZ = Mathf.Clamp(centerZ + r, 0, res - 1);
+        int width = endX - startX + 1; int height = endZ - startZ + 1;
         if (width <= 0 || height <= 0) return;
-        float[,] heights = td.GetHeights(startX, startZ, width, height);
 
+        float[,] heights = td.GetHeights(startX, startZ, width, height);
         for (int i = 0; i < height; i++)
         {
             for (int j = 0; j < width; j++)
             {
-                int currentX = startX + j;
-                int currentZ = startZ + i;
-                float distance = Vector2.Distance(new Vector2(centerX, centerZ), new Vector2(currentX, currentZ));
-
-                if (distance <= customSize)
+                float distance = Vector2.Distance(new Vector2(centerX, centerZ), new Vector2(startX + j, startZ + i));
+                if (distance <= radiusInPixels)
                 {
-                    heights[i, j] = Mathf.Clamp(heights[i, j] + normalizedAmt, 0f, normalizedMaxHeight);
+                    float t = distance / radiusInPixels;
+                    float falloff = 1f - (t * t * (3f - 2f * t));
+                    heights[i, j] = Mathf.Clamp(heights[i, j] + (normalizedAmt * falloff), 0f, normalizedMaxHeight);
                 }
             }
         }
         td.SetHeights(startX, startZ, heights);
+        ApplyAutoCliffTexture(startX, startZ, width, height);
     }
 }

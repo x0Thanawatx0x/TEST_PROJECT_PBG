@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem; // มารับตั๋วระบบใหม่ของ Unity 6 ตรงนี้
 using System.Collections.Generic;
 
 public class ToolManager : MonoBehaviour
@@ -8,7 +9,8 @@ public class ToolManager : MonoBehaviour
     {
         None = 0, House = 1, Road = 2, Furniture = 3,
         Wall = 4, Nature = 5, Pond = 6, Eraser = 7,
-        Mountain = 8 // เพิ่มประเภทเครื่องมือที่ 8 สำหรับดึงภูเขา
+        Mountain = 8,
+        HouseGen = 9 // ✨ เพิ่มประเภทที่ 9 สล็อตสร้างบ้านของพวกเรา
     }
 
     [Header("Current Status")]
@@ -19,9 +21,9 @@ public class ToolManager : MonoBehaviour
     public int natureIndex = 0;
 
     [Header("UI Setup")]
-    public List<Button> toolButtons; // อย่าลืมใส่ปุ่มชิ้นที่ 8 (ภูเขา) เข้ามาใน List บน Inspector นะครับปิ๊บ
+    public List<Button> toolButtons;
 
-    [Header("Highlight Settings (Legacy - Still kept for safety)")]
+    [Header("Highlight Settings (Legacy)")]
     public Vector3 normalScale = Vector3.one;
     public Vector3 selectedScale = new Vector3(1.15f, 1.15f, 1.15f);
     public Color normalColor = Color.white;
@@ -40,21 +42,27 @@ public class ToolManager : MonoBehaviour
 
     void Update()
     {
-        // Shortcut Keys 1-8 (ขยายจาก 7 เป็น 8 เพื่อให้ดักจับปุ่มเลข 8 อัตโนมัติ)
+        // 1. Shortcut Keys 1-8 ระบบดั้งเดิมของปิ๊บ
         for (int i = 1; i <= 8; i++)
         {
             if (Input.GetKeyDown(KeyCode.Alpha0 + i))
                 SelectTool(i);
         }
+        if (Input.GetKeyDown(KeyCode.Keypad8)) SelectTool(8);
+        if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Escape)) SelectTool(0);
 
-        // ดักจับเพิ่มเติมสำหรับฝั่ง Keypad เลข 8 ตัวขวา เพื่อความสะดวกของผู้เล่น
-        if (Input.GetKeyDown(KeyCode.Keypad8))
+        // 2. 🌟 [ระบบ Toggle เลข 9] กดสลับเปิด-ปิดจบใน Class นี้เลยตามสั่ง
+        if (Keyboard.current.digit9Key.wasPressedThisFrame)
         {
-            SelectTool(8);
+            if (currentTool == BuildTool.HouseGen)
+            {
+                SelectTool(0); // ถ้าเปิดอยู่แล้ว กด 9 อีกทีจะปิดสลับเป็น None (มือเปล่า)
+            }
+            else
+            {
+                SelectTool(9); // ถ้าปิดอยู่ กด 9 จะเข้าโหมดสล็อตสร้างบ้านทันที
+            }
         }
-
-        if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Escape))
-            SelectTool(0);
     }
 
     public void SelectTool(int index)
@@ -79,19 +87,12 @@ public class ToolManager : MonoBehaviour
         for (int i = 0; i < toolButtons.Count; i++)
         {
             if (toolButtons[i] == null) continue;
-
-            // ดึง Animator จากปุ่มมาใช้งาน
             Animator anim = toolButtons[i].GetComponent<Animator>();
             bool isSelected = (int)currentTool == i + 1;
 
-            if (anim != null)
-            {
-                // ส่งค่า IsSelected เข้าไปใน Animator 
-                anim.SetBool("IsSelected", isSelected);
-            }
+            if (anim != null) anim.SetBool("IsSelected", isSelected);
             else
             {
-                // สำรองไว้ในกรณีที่ปุ่มไหนไม่มี Animator จะได้ยังเห็นสีเขียวอยู่แบบเดิม
                 Image img = toolButtons[i].GetComponent<Image>();
                 toolButtons[i].transform.localScale = isSelected ? selectedScale : normalScale;
                 if (img != null) img.color = isSelected ? selectedColor : normalColor;
