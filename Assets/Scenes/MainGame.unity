@@ -1882,10 +1882,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 623dfd38df6a7b8419a5f123b45628de, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  toolManager: {fileID: 0}
+  toolManager: {fileID: 25014905}
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
+  buildableLayer:
+    serializedVersion: 2
+    m_Bits: 64
   targetTerrain: {fileID: 1470743128}
   terrainBufferZone: 1.5
   previewMaterial: {fileID: 2100000, guid: 5400a5353f046de4aa6f876815f3ced5, type: 2}
@@ -1894,6 +1897,28 @@ MonoBehaviour:
   floorPrefab: {fileID: 8474471227682614471, guid: 3fbefb69e8ee66848bf3e9a81435f4f5, type: 3}
   floorSize: 1
   floorThickness: 0.1
+  autoFurnitureList:
+  - furnitureName: Bed
+    furnitureType: 0
+    prefab: {fileID: 3044596147092144019, guid: c4aa24141ce78524db66fc2fb8d44dd4, type: 3}
+    spawnCount: 1
+    spawnChance: 50
+    minRoomWidthRequired: 3
+    minRoomLengthRequired: 3
+  - furnitureName: closet
+    furnitureType: 1
+    prefab: {fileID: 7299704283268504498, guid: 5dd8c7a85e8cbcc458d7a3c2a4f363dd, type: 3}
+    spawnCount: 1
+    spawnChance: 50
+    minRoomWidthRequired: 3
+    minRoomLengthRequired: 3
+  - furnitureName: Table
+    furnitureType: 2
+    prefab: {fileID: 716583068734863615, guid: 23c233f24d41e154998f6b0f09ec6c9f, type: 3}
+    spawnCount: 1
+    spawnChance: 50
+    minRoomWidthRequired: 3
+    minRoomLengthRequired: 3
 --- !u!4 &687437749
 Transform:
   m_ObjectHideFlags: 0
