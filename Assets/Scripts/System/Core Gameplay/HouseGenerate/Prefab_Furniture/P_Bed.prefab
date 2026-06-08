@@ -43,7 +43,7 @@ GameObject:
   - component: {fileID: 3151369569491260865}
   - component: {fileID: 8247197366832203810}
   - component: {fileID: 3932334191860633746}
-  - component: {fileID: 2203765673825698268}
+  - component: {fileID: 2755289178427447188}
   m_Layer: 0
   m_Name: Bed
   m_TagString: Untagged
@@ -119,7 +119,7 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &2203765673825698268
+--- !u!65 &2755289178427447188
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

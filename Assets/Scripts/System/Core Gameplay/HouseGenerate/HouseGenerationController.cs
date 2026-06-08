@@ -2,33 +2,10 @@
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
 
-public enum FurnitureType
-{
-    Bed,
-    Wardrobe,
-    Desk,
-    Decoration
-}
-
-[System.Serializable]
-public class FurnitureItem
-{
-    public string furnitureName;
-    public FurnitureType furnitureType;
-    public GameObject prefab;
-    [Range(0, 10)]
-    public int spawnCount = 1;
-
-    // ✨ พระเอกใหม่สำหรับรอบนี้ครับปิ๊บ! เอาไว้กำหนดโอกาสเกิด (สุ่มว่าจำเป็นต้องมีครบไหม)
-    [Header("🎲 ระบบสุ่มโอกาสเกิด")]
-    [Range(0f, 100f)]
-    public float spawnChance = 100f; // ตั้งค่า 100% คือต้องเกิดแน่นอน, ถ้าน้อยกว่านั้นคือสุ่มลุ้นเอาครับ
-
-    [Header("📐 เงื่อนไขขนาดห้องขั้นต่ำ (เมตร)")]
-    public float minRoomWidthRequired = 3f;
-    public float minRoomLengthRequired = 3f;
-}
-
+/// <summary>
+/// ระบบเจนบ้านสไตล์ Cozy Sandbox สำหรับ Unity 6 (Center Pivot 2m)
+/// เวอร์ชันเสร็จสมบูรณ์: เพิ่มระบบล็อกขนาดขั้นต่ำของตัวบ้าน (Minimum Size Clamping)
+/// </summary>
 public class HouseGenerationController : MonoBehaviour
 {
     [Header("Manager Reference")]
@@ -43,15 +20,40 @@ public class HouseGenerationController : MonoBehaviour
     [Header("Cozy Preview Style")]
     [SerializeField] private Material previewMaterial;
 
-    [Header("Prototype Modular Prefabs")]
+    [Header("🧱 ระบบโครงสร้างกำแพงโมดูลาร์ (Center Pivot 2m)")]
+    [Tooltip("เสาค้ำมุมห้อง - ใช้สำหรับปักบังรอยต่อฉากมุมห้อง")]
+    [SerializeField] private GameObject cornerPillarPrefab;
+
+    [Tooltip("โมเดลกำแพงทึบกว้าง 2 เมตร (Pivot อยู่ตรงกลางแผ่นพอดีเป๊ะ)")]
     [SerializeField] private GameObject wallPrefab;
-    [SerializeField] private float wallWidth = 1f;
+
+    [Tooltip("โมเดลกำแพงหน้าต่างกว้าง 2 เมตร (Pivot อยู่ตรงกลางแผ่นพอดีเป๊ะ)")]
+    [SerializeField] private GameObject windowWallPrefab;
+
+    [Range(0f, 100f)]
+    [SerializeField] private float windowSpawnChance = 30f;
+
+    [Tooltip("ความกว้างจริงของโมเดลกำแพง (ใส่ค่า 2)")]
+    [SerializeField] private float wallWidth = 2f;
+
+    [Header("🚪 ระบบผนังเจาะช่องประตู")]
+    [Tooltip("โมเดลกำแพงประตูกว้าง 2 เมตร (Pivot อยู่ตรงกลางแผ่นพอดีเป๊ะ)")]
+    [SerializeField] private GameObject doorWallFramePrefab;
+
+    [Tooltip("บานประตูเดี่ยว")]
+    [SerializeField] private GameObject standaloneDoorPrefab;
+
+    [Header("📐 ระบบพื้นบ้านและการจำกัดสเกลขั้นต่ำ")]
+    [Tooltip("โมเดลแผ่นพื้น (Pivot อยู่ตรงกลางแผ่น)")]
     [SerializeField] private GameObject floorPrefab;
-    [SerializeField] private float floorSize = 1f;
+
+    [Tooltip("ขนาดของโมเดลพื้นจริงในเอนจิ้น (ใส่ค่า 2)")]
+    [SerializeField] private float floorSize = 2f;
+
     [SerializeField] private float floorThickness = 0.1f;
 
-    [Header("🤖 ระบบ Dynamic AI จัดห้อง (ฉบับสุ่มโอกาสเกิด ไม่จำเป็นต้องมีครบ 100%)")]
-    [SerializeField] private List<FurnitureItem> autoFurnitureList = new List<FurnitureItem>();
+    [Tooltip("ขนาดขั้นต่ำของตัวบ้านในหน่วยเมตร (ปิ๊บใส่เลข 7 ได้เลย ระบบจะปัดเศษเข้าล็อกตารางพื้นให้อัตโนมัติ)")]
+    [SerializeField] private float minBuildSize = 7f;
 
     private Vector3 startPlacementPoint;
     private Vector3 endPlacementPoint;
@@ -64,14 +66,14 @@ public class HouseGenerationController : MonoBehaviour
     private List<GameObject> spawnedActualPieces = new List<GameObject>();
     private List<GameObject> currentPreviewPieces = new List<GameObject>();
 
-    void Start()
+    private void Start()
     {
         mainCamera = Camera.main;
         if (targetTerrain == null) targetTerrain = Terrain.activeTerrain;
         if (toolManager == null) toolManager = FindFirstObjectByType<ToolManager>();
     }
 
-    void Update()
+    private void Update()
     {
         if (toolManager == null) return;
 
@@ -134,17 +136,33 @@ public class HouseGenerationController : MonoBehaviour
             float minZ = Mathf.Min(startPlacementPoint.z, endPlacementPoint.z);
             float maxZ = Mathf.Max(startPlacementPoint.z, endPlacementPoint.z);
 
-            int countX = Mathf.RoundToInt((maxX - minX) / floorSize);
-            int countZ = Mathf.RoundToInt((maxZ - minZ) / floorSize);
-            if (countX == 0) countX = 1;
-            if (countZ == 0) countZ = 1;
+            // คำนวณจำนวนแผ่นพื้นตามระยะเมาส์จริง
+            int floorCountX = Mathf.RoundToInt((maxX - minX) / floorSize);
+            int floorCountZ = Mathf.RoundToInt((maxZ - minZ) / floorSize);
 
-            float baseFloorY = lockedBuildHeightY + 0.02f;
+            // 🎯 [ระบบดักจับขนาดขั้นต่ำ] แปลงค่าเมตรขั้นต่ำ (minBuildSize) ให้เป็นจำนวนบล็อกพื้นขั้นต่ำ
+            int minFloorCount = Mathf.Max(1, Mathf.RoundToInt(minBuildSize / floorSize));
+
+            // บังคับล็อกว่าจำนวนแผ่นพื้นในแต่ละแกนห้ามต่ำกว่าค่าที่กำหนด
+            if (floorCountX < minFloorCount) floorCountX = minFloorCount;
+            if (floorCountZ < minFloorCount) floorCountZ = minFloorCount;
+
+            // อัปเดตพิกัดปลายสายของขอบเขตบ้านให้กางออกตามขนาดขั้นต่ำจริง ดินและกำแพงจะได้ไม่หดสเกล
+            maxX = minX + (floorCountX * floorSize);
+            maxZ = minZ + (floorCountZ * floorSize);
+
+            int wallCountX = Mathf.RoundToInt((maxX - minX) / wallWidth);
+            int wallCountZ = Mathf.RoundToInt((maxZ - minZ) / wallWidth);
+            if (wallCountX == 0) wallCountX = 1;
+            if (wallCountZ == 0) wallCountZ = 1;
+
+            float baseFloorY = lockedBuildHeightY + 0.05f;
             float baseWallY = baseFloorY + floorThickness;
 
-            for (int x = 0; x < countX; x++)
+            // 1. พรีวิวพื้น
+            for (int x = 0; x < floorCountX; x++)
             {
-                for (int z = 0; z < countZ; z++)
+                for (int z = 0; z < floorCountZ; z++)
                 {
                     float fX = minX + (x * floorSize) + (floorSize / 2f);
                     float fZ = minZ + (z * floorSize) + (floorSize / 2f);
@@ -152,96 +170,32 @@ public class HouseGenerationController : MonoBehaviour
                 }
             }
 
-            for (int i = 0; i < countX; i++)
+            int doorIndexX = wallCountX / 2;
+            float halfWall = wallWidth / 2f;
+
+            // 2. แกน X: วางกำแพงแนวหน้าบ้าน-หลังบ้าน
+            for (int i = 0; i < wallCountX; i++)
             {
-                float pX = minX + (i * wallWidth) + (wallWidth / 2f);
-                SpawnPreviewPiece(wallPrefab, new Vector3(pX, baseWallY, minZ), Quaternion.Euler(0, 0, 0));
+                float pX = minX + (i * wallWidth) + halfWall;
+
+                if (i == doorIndexX && doorWallFramePrefab != null)
+                {
+                    SpawnPreviewPiece(doorWallFramePrefab, new Vector3(pX, baseWallY, minZ), Quaternion.Euler(0, 0, 0));
+                }
+                else
+                {
+                    SpawnPreviewPiece(wallPrefab, new Vector3(pX, baseWallY, minZ), Quaternion.Euler(0, 0, 0));
+                }
+
                 SpawnPreviewPiece(wallPrefab, new Vector3(pX, baseWallY, maxZ), Quaternion.Euler(0, 180, 0));
             }
 
-            for (int j = 0; j < countZ; j++)
+            // 3. แกน Z: วางกำแพงแนวซ้าย-ขวา
+            for (int j = 0; j < wallCountZ; j++)
             {
-                float pZ = minZ + (j * wallWidth) + (wallWidth / 2f);
+                float pZ = minZ + (j * wallWidth) + halfWall;
                 SpawnPreviewPiece(wallPrefab, new Vector3(minX, baseWallY, pZ), Quaternion.Euler(0, 90, 0));
                 SpawnPreviewPiece(wallPrefab, new Vector3(maxX, baseWallY, pZ), Quaternion.Euler(0, -90, 0));
-            }
-        }
-    }
-
-    // --- 🤖 ฟังก์ชัน Dynamic AI: เพิ่มตรรกะสุ่มทอยเต๋า Probability เพื่อเช็กว่าไอเทมชิ้นนั้นควรเกิดไหม ---
-    private void AutoDecorateInteriorDynamic(float minX, float maxX, float minZ, float maxZ, float baseFloorY)
-    {
-        float roomWidth = maxX - minX;
-        float roomLength = maxZ - minZ;
-        float spawnY = baseFloorY + floorThickness;
-
-        List<Vector3> availableSlots = new List<Vector3>();
-        for (float x = minX + 1f; x <= maxX - 1f; x += 1f)
-        {
-            for (float z = minZ + 1f; z <= maxZ - 1f; z += 1f)
-            {
-                availableSlots.Add(new Vector3(x, spawnY, z));
-            }
-        }
-
-        if (availableSlots.Count == 0) return;
-
-        HashSet<Vector3> occupiedSlots = new HashSet<Vector3>();
-
-        foreach (FurnitureItem item in autoFurnitureList)
-        {
-            if (item.prefab == null || item.spawnCount <= 0) continue;
-
-            if (roomWidth < item.minRoomWidthRequired || roomLength < item.minRoomLengthRequired) continue;
-
-            // 🎲 🛠️ [จุดแก้ไขสำคัญ: ทอยลูกเต๋าวัดดวง] 
-            // สุ่มตัวเลข 0-100 ขึ้นมา ถ้าเลขที่สุ่มได้ดัน "มากกว่า" ค่าสเปคที่ปิ๊บตั้งไว้ AI จะสั่งข้ามไอเทมประเภทนี้ทันที!
-            float rollDice = Random.Range(0f, 100f);
-            if (rollDice > item.spawnChance)
-            {
-                Debug.Log($"🎲 AI ทอยเต๋าได้ {rollDice:F1} (โอกาสเกิดจริง {item.spawnChance}%) -> สั่งข้ามไม่เสก {item.furnitureName} ในรอบนี้");
-                continue; // กระโดดข้ามไอเทมชิ้นนี้ไปเลย ไม่จำเป็นต้องมีครบทุกชิ้นแล้วครับปิ๊บ!
-            }
-
-            for (int i = 0; i < item.spawnCount; i++)
-            {
-                Vector3 bestSlot = Vector3.zero;
-                bool slotFound = false;
-                Quaternion targetRotation = Quaternion.identity;
-
-                List<Vector3> randomSlots = new List<Vector3>(availableSlots);
-
-                for (int t = 0; t < randomSlots.Count; t++)
-                {
-                    Vector3 temp = randomSlots[t];
-                    int randomIndex = Random.Range(t, randomSlots.Count);
-                    randomSlots[t] = randomSlots[randomIndex];
-                    randomSlots[randomIndex] = temp;
-                }
-
-                foreach (Vector3 slot in randomSlots)
-                {
-                    if (!occupiedSlots.Contains(slot))
-                    {
-                        bestSlot = slot;
-                        slotFound = true;
-                        break;
-                    }
-                }
-
-                float[] smartRotations = { 0f, 90f, 180f, 270f };
-                float randomYRot = smartRotations[Random.Range(0, smartRotations.Length)];
-                targetRotation = Quaternion.Euler(0, randomYRot, 0);
-
-                if (!slotFound)
-                {
-                    Debug.LogWarning($"⚠️ สเปซเต็ม! ไม่สามารถวาง {item.furnitureName} ชิ้นที่ {i + 1} ได้");
-                    break;
-                }
-
-                occupiedSlots.Add(bestSlot);
-                GameObject spawnedObj = Instantiate(item.prefab, bestSlot, targetRotation);
-                spawnedActualPieces.Add(spawnedObj);
             }
         }
     }
@@ -253,19 +207,31 @@ public class HouseGenerationController : MonoBehaviour
         float minZ = Mathf.Min(startPlacementPoint.z, endPlacementPoint.z);
         float maxZ = Mathf.Max(startPlacementPoint.z, endPlacementPoint.z);
 
-        int countX = Mathf.RoundToInt((maxX - minX) / floorSize);
-        int countZ = Mathf.RoundToInt((maxZ - minZ) / floorSize);
-        if (countX == 0) countX = 1;
-        if (countZ == 0) countZ = 1;
+        int floorCountX = Mathf.RoundToInt((maxX - minX) / floorSize);
+        int floorCountZ = Mathf.RoundToInt((maxZ - minZ) / floorSize);
+
+        // 🎯 ดักจับขนาดขั้นต่ำตอนกดคลิกสร้างจริงเช่นเดียวกับระบบ Preview
+        int minFloorCount = Mathf.Max(1, Mathf.RoundToInt(minBuildSize / floorSize));
+        if (floorCountX < minFloorCount) floorCountX = minFloorCount;
+        if (floorCountZ < minFloorCount) floorCountZ = minFloorCount;
+
+        maxX = minX + (floorCountX * floorSize);
+        maxZ = minZ + (floorCountZ * floorSize);
+
+        int wallCountX = Mathf.RoundToInt((maxX - minX) / wallWidth);
+        int wallCountZ = Mathf.RoundToInt((maxZ - minZ) / wallWidth);
+        if (wallCountX == 0) wallCountX = 1;
+        if (wallCountZ == 0) wallCountZ = 1;
 
         if (targetTerrain != null) FlattenTerrainAreaForce(minX, maxX, minZ, maxZ, lockedBuildHeightY);
 
-        float baseFloorY = lockedBuildHeightY + 0.02f;
+        float baseFloorY = lockedBuildHeightY + 0.05f;
         float baseWallY = baseFloorY + floorThickness;
 
-        for (int x = 0; x < countX; x++)
+        // 1. สร้างพื้นจริง
+        for (int x = 0; x < floorCountX; x++)
         {
-            for (int z = 0; z < countZ; z++)
+            for (int z = 0; z < floorCountZ; z++)
             {
                 float fX = minX + (x * floorSize) + (floorSize / 2f);
                 float fZ = minZ + (z * floorSize) + (floorSize / 2f);
@@ -275,24 +241,66 @@ public class HouseGenerationController : MonoBehaviour
             }
         }
 
-        for (int i = 0; i < countX; i++)
+        // 2. เสกเสาค้ำมุม 4 ด้าน
+        SpawnActualPillar(new Vector3(minX, baseWallY, minZ));
+        SpawnActualPillar(new Vector3(maxX, baseWallY, minZ));
+        SpawnActualPillar(new Vector3(minX, baseWallY, maxZ));
+        SpawnActualPillar(new Vector3(maxX, baseWallY, maxZ));
+
+        int doorIndexX = wallCountX / 2;
+        float halfWall = wallWidth / 2f;
+
+        // 3. สร้างกำแพงจริงแกน X
+        for (int i = 0; i < wallCountX; i++)
         {
-            float pX = minX + (i * wallWidth) + (wallWidth / 2f);
-            SpawnActualPiece(wallPrefab, new Vector3(pX, baseWallY, minZ), Quaternion.Euler(0, 0, 0));
-            SpawnActualPiece(wallPrefab, new Vector3(pX, baseWallY, maxZ), Quaternion.Euler(0, 180, 0));
+            float pX = minX + (i * wallWidth) + halfWall;
+
+            if (i == doorIndexX && doorWallFramePrefab != null)
+            {
+                GameObject frameObj = Instantiate(doorWallFramePrefab, new Vector3(pX, baseWallY, minZ), Quaternion.Euler(0, 0, 0));
+                spawnedActualPieces.Add(frameObj);
+
+                if (standaloneDoorPrefab != null)
+                {
+                    Instantiate(standaloneDoorPrefab, new Vector3(pX, baseWallY, minZ), Quaternion.Euler(0, 0, 0), frameObj.transform);
+                }
+            }
+            else
+            {
+                SpawnProceduralWallPiece(new Vector3(pX, baseWallY, minZ), Quaternion.Euler(0, 0, 0));
+            }
+
+            SpawnProceduralWallPiece(new Vector3(pX, baseWallY, maxZ), Quaternion.Euler(0, 180, 0));
         }
 
-        for (int j = 0; j < countZ; j++)
+        // 4. สร้างกำแพงจริงแกน Z
+        for (int j = 0; j < wallCountZ; j++)
         {
-            float pZ = minZ + (j * wallWidth) + (wallWidth / 2f);
-            SpawnActualPiece(wallPrefab, new Vector3(minX, baseWallY, pZ), Quaternion.Euler(0, 90, 0));
-            SpawnActualPiece(wallPrefab, new Vector3(maxX, baseWallY, pZ), Quaternion.Euler(0, -90, 0));
+            float pZ = minZ + (j * wallWidth) + halfWall;
+            SpawnProceduralWallPiece(new Vector3(minX, baseWallY, pZ), Quaternion.Euler(0, 90, 0));
+            SpawnProceduralWallPiece(new Vector3(maxX, baseWallY, pZ), Quaternion.Euler(0, -90, 0));
         }
-
-        AutoDecorateInteriorDynamic(minX, maxX, minZ, maxZ, baseFloorY);
 
         ClearPreviewPieces();
         currentState = BuilderState.Idle;
+    }
+
+    private void SpawnProceduralWallPiece(Vector3 position, Quaternion rotation)
+    {
+        GameObject wallMeshToSpawn = wallPrefab;
+        if (windowWallPrefab != null && Random.Range(0f, 100f) <= windowSpawnChance)
+        {
+            wallMeshToSpawn = windowWallPrefab;
+        }
+        GameObject spawnedWallObj = Instantiate(wallMeshToSpawn, position, rotation);
+        spawnedActualPieces.Add(spawnedWallObj);
+    }
+
+    private void SpawnActualPillar(Vector3 position)
+    {
+        if (cornerPillarPrefab == null) return;
+        GameObject pillarObj = Instantiate(cornerPillarPrefab, position, Quaternion.identity);
+        spawnedActualPieces.Add(pillarObj);
     }
 
     private void SpawnPreviewPiece(GameObject prefab, Vector3 position, Quaternion rotation)
@@ -302,7 +310,6 @@ public class HouseGenerationController : MonoBehaviour
         if (previewObj.TryGetComponent<Collider>(out Collider col)) col.enabled = false;
         if (previewMaterial != null)
         {
-            if (previewObj.TryGetComponent<Renderer>(out Renderer rend)) rend.material = previewMaterial;
             foreach (Renderer childRend in previewObj.GetComponentsInChildren<Renderer>()) childRend.material = previewMaterial;
         }
         currentPreviewPieces.Add(previewObj);
@@ -334,13 +341,6 @@ public class HouseGenerationController : MonoBehaviour
         targetTerrain.Flush();
     }
 
-    private void SpawnActualPiece(GameObject prefab, Vector3 position, Quaternion rotation)
-    {
-        if (prefab == null) return;
-        GameObject piece = Instantiate(prefab, position, rotation);
-        spawnedActualPieces.Add(piece);
-    }
-
     private Vector3 SnapToGrid(Vector3 position, float snapValue)
     {
         return new Vector3(Mathf.Round(position.x / snapValue) * snapValue, position.y, Mathf.Round(position.z / snapValue) * snapValue);
@@ -357,5 +357,13 @@ public class HouseGenerationController : MonoBehaviour
         if (obj == null) return;
         obj.layer = newLayer;
         foreach (Transform child in obj.transform) SetLayerRecursively(child.gameObject, newLayer);
+    }
+
+    public void BuildHouseFromExternalAPI(Vector3 simulatedStartPoint, Vector3 simulatedEndPoint)
+    {
+        this.startPlacementPoint = SnapToGrid(simulatedStartPoint, floorSize);
+        this.endPlacementPoint = SnapToGrid(simulatedEndPoint, floorSize);
+        this.lockedBuildHeightY = startPlacementPoint.y;
+        ConfirmBuildAndFlattenTerrain();
     }
 }
